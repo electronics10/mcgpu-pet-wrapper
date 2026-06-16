@@ -1,54 +1,106 @@
 ## Installation
 
-This package wraps [MCGPU-PET](https://github.com/DIDSR/MCGPU-PET). It is managed with [pixi](https://pixi.sh).
+This package wraps [MCGPU-PET](https://github.com/DIDSR/MCGPU-PET) and is managed with [pixi](https://pixi.sh). If you don't have pixi, install it first by following the instructions at https://pixi.sh.
 
-> **Note on the binary.** A compiled `MCGPU-PET.x` is included for convenience, but GPU binaries are architecture-specific. If you clone this on a machine with a different GPU and the simulator fails to run, rebuild it from the [MCGPU-PET source](https://github.com/DIDSR/MCGPU-PET) and replace `mcgpu_pet_wrapper/MCGPU-PET.x`. Running the simulator also requires an NVIDIA GPU and CUDA. The Python API (building voxel spaces, reading outputs) works without a GPU; only `Runner` needs one.
+> **Note on the binary and GPU.** A compiled `MCGPU-PET.x` is included, but GPU binaries are architecture-specific. If you clone this on a machine with a different GPU and the simulator fails to run, rebuild it from the [MCGPU-PET source](https://github.com/DIDSR/MCGPU-PET) and replace `mcgpu_pet_wrapper/MCGPU-PET.x`. The Python API (building voxel spaces, reading outputs) works without a GPU; only running an actual simulation (`Runner`) needs an NVIDIA GPU with CUDA.
 
-### Use it from another project (recommended)
+### Step 1 — Clone this repository
 
-In your downstream project's `pyproject.toml` (or `pixi.toml`), add this package as an editable path dependency pointing at wherever you cloned it:
+Pick a location to keep the wrapper. A simple convention is to keep the wrapper and the projects that use it **side by side** in one folder:
+
+```bash
+mkdir -p ~/projects
+cd ~/projects
+git clone https://github.com/electronics10/mcgpu-pet-wrapper.git
+```
+
+You now have `~/projects/mcgpu-pet-wrapper`.
+
+### Step 2 — Create your own project next to it
+
+```bash
+cd ~/projects
+mkdir my-pet-project
+cd my-pet-project
+pixi init
+```
+
+`pixi init` creates a `pixi.toml` file. Your layout now looks like this:
+
+```
+~/projects/
+├── mcgpu-pet-wrapper/      <- the wrapper you cloned
+└── my-pet-project/         <- your project, where you write code
+    └── pixi.toml
+```
+
+### Step 3 — Add the wrapper as a dependency
+
+Open `my-pet-project/pixi.toml` in a text editor and add these lines at the end:
 
 ```toml
-[tool.pixi.pypi-dependencies]
+[pypi-dependencies]
 mcgpu-pet-wrapper = { path = "../mcgpu-pet-wrapper", editable = true }
 ```
 
-Then `pixi install` in that project. Now `import mcgpu_pet_wrapper` works from anywhere in the project. `editable = true` means edits to the wrapper take effect immediately, no reinstall.
+The path `../mcgpu-pet-wrapper` means "go up one folder, then into mcgpu-pet-wrapper" -- it is relative to _your project_. This works because of the side-by-side layout above. (If you cloned the wrapper somewhere else, use the full absolute path instead, e.g. `path = "/home/you/tools/mcgpu-pet-wrapper"`.)
 
-### Or work on the wrapper directly
+`editable = true` means that if you ever edit the wrapper's code, the changes take effect immediately, with no reinstall.
+
+`[pypi-dependencies]`  is used (not `[tool.pixi.pypi-dependencies]`) because in a standalone `pixi.toml` the section is top-level; the `tool.pixi.` prefix is only for when the config lives inside a `pyproject.toml`. Since `pixi init` creates a `pixi.toml`, the shorter form is correct. Worth knowing if you have a `pyproject.toml`-based project instead — then you'd need the prefixed form.
+
+Then install:
 
 ```bash
-git clone https://github.com/electronics10/mcgpu-pet-wrapper.git
-cd mcgpu-pet-wrapper
 pixi install
-pixi run python -c "import mcgpu_pet_wrapper as mpw; print('it works')"
 ```
 
-## Quick start
+### Step 4 — Write and run a script
+
+Create a file `my-pet-project/main.py`:
 
 ```python
 import mcgpu_pet_wrapper as mpw
 
-# 1. load the single source of truth
-cfg = mpw.load_config("mcgpu_pet_wrapper/templates/template.json")
+# Load the built-in default configuration (no file path needed).
+cfg = mpw.default_config()
 
-# 2. build a voxel space (here: a standard NEMA IQ phantom, sized from cfg)
-voxel_space = mpw.nema_iq_preclinical(cfg, hot_activity_Bq_per_mL=37000.0)
+# Build a simple test object: a point source.
+voxel_space = mpw.point_source(cfg)
 
-# 3. stage a run directory (writes config.json, MCGPU-PET.in, voxel_space.vox)
+# Stage a run directory (writes config.json, MCGPU-PET.in, voxel_space.vox).
 mpw.build_run("data/run_0", cfg, voxel_space)
 
-# 4. run the simulator (needs the GPU + binary)
+print("Setup OK. Run directory created at data/run_0.")
+```
+
+Run it **through pixi** so it uses the project's environment:
+
+```bash
+pixi run python main.py
+```
+
+> Always use `pixi run python ...`, not plain `python ...`. The wrapper lives inside the project's pixi environment, so plain `python` won't find it (you'd get `ModuleNotFoundError: No module named 'mcgpu_pet_wrapper'`).
+
+If you see `Setup OK.`, everything is installed correctly.
+
+### Step 5 — Run an actual simulation (needs a GPU)
+
+The step above builds the input files but does not run the simulator. To run it (on a machine with an NVIDIA GPU and the compiled binary):
+
+```python
 result = mpw.Runner()("data/run_0", on_existing="overwrite")
 
-# 5. read the outputs into correctly-shaped numpy arrays
 trues   = mpw.read_sinogram(result.sinogram_trues,   cfg)   # (NSINOS, NANGLES, NRAD)
 scatter = mpw.read_sinogram(result.sinogram_scatter, cfg)
+print("trues:", trues.shape, "total counts:", trues.sum())
 ```
 
 See the sections below for the full walkthrough of every module.
 
 ## 1 Prerequisite for MCGPU-PET
+
+(You may skip this part and will only need to read this if you encounter GPU compatibility problems.)
 
 [MCGPU-PET](https://github.com/DIDSR/MCGPU-PET.git) is a research code; the authors likely developed it by extending NVIDIA CUDA sample programs. Therefore, CUDA samples dependencies such as `helper_functions.h` are essential but not shipped with the distribution. Moreover, since GPU binaries are architecture-specific (unlike x86-64 CPU binaries), distributing a prebuilt `.x` binary is impractical.
 
