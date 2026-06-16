@@ -52,6 +52,7 @@ The path `../mcgpu-pet-wrapper` means "go up one folder, then into mcgpu-pet-wra
 Then install:
 
 ```bash
+pixi add python
 pixi install
 ```
 
