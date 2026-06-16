@@ -1,5 +1,5 @@
 from .config import (
-    load_config, validate_config, num_voxels, grid_size_mm, 
+    default_config, load_config, validate_config, num_voxels, grid_size_mm, 
     voxel_space_shape_xyz, voxel_space_shape_zyx, voxel_space_extent_mm, 
     segment_table, sinogram_shape,
 )
@@ -12,8 +12,8 @@ from .data_reader import (read_sinogram, read_sinogram_segments,
                           read_emission_image, summarize_sinogram)
 
 __all__ = [
-    "load_config", "validate_config", "num_voxels", "grid_size_mm",
-    "voxel_space_shape_xyz", "voxel_space_shape_zyx", 
+    "default_config", "load_config", "validate_config", "num_voxels", 
+    "grid_size_mm", "voxel_space_shape_xyz", "voxel_space_shape_zyx", 
     "voxel_space_extent_mm", "segment_table", "sinogram_shape", 
     "VoxelGrid", "VoxelSpaceBuilder", "VoxFileGenerator", "read_vox",
     "InFileGenerator", "Runner", "build_run", "RunResult",

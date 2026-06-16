@@ -65,6 +65,9 @@ def load_config(*paths):
                 merged[section] = fields
     return merged
 
+def default_config():
+    template_path = Path(__file__).parent / "templates" / "template.json"
+    return load_config(template_path)
 
 # ----------------------------------------------------------------------------
 # Axis-order unpacking -- the ONLY place that turns triples into named axes
