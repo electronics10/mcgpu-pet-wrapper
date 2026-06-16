@@ -1,3 +1,6 @@
+## Introduction
+This is a Python wrapper which wraps MCGPU-PET (Badal et al., Comput. Phys. Commun. 295 (2024) 109008, doi:10.1016/j.cpc.2023.109008), developed at the US FDA and in the public domain (17 U.S.C. §105). The bundled MCGPU-PET.x binary and the simulation engine are their work; this repository adds a Python configuration, phantom-building, and I/O layer. If you use this in published work, please cite the original MCGPU-PET paper.
+
 ## Installation
 
 This package wraps [MCGPU-PET](https://github.com/DIDSR/MCGPU-PET) and is managed with [pixi](https://pixi.sh). If you don't have pixi, install it first by following the instructions at https://pixi.sh.
