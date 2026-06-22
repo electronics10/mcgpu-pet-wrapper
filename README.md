@@ -59,6 +59,11 @@ pixi add python
 pixi install
 ```
 
+Supplement: 
+1. You may add a `pyrightconfig.json` in the local root, a version-controllable way to configure Pyright-based tools (e.g., Pylance), to resolve static analysis of Pylance for better experience.
+2. Ask AI for help if you don't know how to install the module.
+
+
 ### Step 4 — Write and run a script
 
 Create a file `my-pet-project/main.py`:
