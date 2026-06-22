@@ -68,6 +68,7 @@ import mcgpu_pet_wrapper as mpw
 
 # Load the built-in default configuration (no file path needed).
 cfg = mpw.default_config()
+mpw.validate_config(cfg) # validate
 
 # Build a simple test object: a point source.
 voxel_space = mpw.point_source(cfg)
@@ -299,11 +300,19 @@ mc-gpu_dose.dat                 # OUTPUT VOXEL DOSE FILE NAME
 - MCGPU-PET assumes that the axial direction is the z direction. With the above specification, a scanner of axial FOV 12.656 cm is generated, which forms a cylinder consists of 80 equally spaced rings, with 336 detectors (crystals) attached to each ring. 
 - The image resolution field is, in the current MCGPU-PET, effectively nothing. It's read into `RES`, used only to compute `NVOXS`, and `NVOXS` is referenced only in dead/commented code. It's a vestige of an earlier design (probably when the emission image was a fixed square `RES×RES×NZS` grid independent of the voxel object). The authors flagged it as possibly unnecessary. (`RES` feeds only `NVOXS = RES*RES*NZS`, and `NVOXS` is passed into the kernel but used only in a commented-out line (`//if (ivox>=0 && ivox<*NVOXS)`), and annotated by the authors at line 183: `//FEB2022 !!DeBuG!! Is this input necessary? And should it be NVOX_SIM?`)
 - One thing worth mention is the emission image (`image_True.raw.gz`, `image_Scatter.raw.gz`). The emission image is exactly the voxel-object size (determined by the `.vox` input). The source code confirms it: it increments `Imagen_T_dev[blockIdx.x + blockIdx.y*gridDim.x + blockIdx.z*gridDim.x*gridDim.y]`, and the grid is one block per voxel. The emission image indexes by emitting voxel, so it must be voxel-object-shaped and has nothing to do with the `.in` file specifications.
-- As for the rest fields, they are mainly parameters for sinograms and specifications of how the LOR are binned in 3D (Michelogram). One may need to know the basics of sinogram and Michellogram in advance. 
-	- The number of angular bins is normally set us half the number of the detectors (crystals) $N_d/2$ since it only ranges from $0$ to $\pi$. 
-	- The number of the raidal bins, inside the transverse field of view, is normally $N_{d}+1$. The "+1" arises because radial positions are sampled symmetrically about the central LOR (the line through the scanner axis): with $N_d$ even, the symmetric arrangement yields an odd count $N_d + 1$. Edge-trimming removes the outermost, geometrically distorted bins: $N_r = N_d + 1 − 2·N_{trim} = 336 + 1 − 190 = 147$. 
+- As for the rest fields, they are mainly parameters for sinograms and specifications of how the LOR are binned in 3D (Michelogram). One may need to know the basics of sinogram and Michellogram in advance.  
 	- The number of Z (axial) slices `NZS` is normally two times the number of rings (row) minus one. There are $N_{rings}$ direct planes (a ring paired with itself) and $N_{rings} − 1$ planes that sit _between_ adjacent rings (ring i with ring i+1), giving $2·N_{rings} − 1$ total. `NZS = 159` is the maximum number of planes a single segment can hold (the direct segment, segment 0, achieves it; `159 = 2·N_rings − 1`). It is used as the per-segment offset stride. The total stored plane count `NSINOS = 1293` is the _sum_ of the actual plane counts across all 15 segments (159+2·(147+125+103+81+59+37+15)), each segment holding fewer planes than segment 0 because span compression and the MRD cutoff progressively limit the reachable axial positions. The kernel lays out the sinogram by giving every segment the same stride `NZS` in a provisional layout (`ofseg = iseg*NZS`), then subtracts correction terms (`-(SPAN+1)`, `-floor(ofk)*2*SPAN`) to pack the shorter segments tightly. `NZS` is the stride constant the packing arithmetic is built around. The code needs it as an input because it's the scaffold the offset computation hangs on — it can't be silently derived inside the kernel without rederiving the whole michelogram layout. (Whether they _should_ have made you specify it versus computing it from `N_rings` is a design choice; functionally `159 = 2·80−1` so it's determined by the ring count, but they chose to read it explicitly.)
+
 	- After the simulation, we'll recieve the `sinogram.raw.gz` files. The flat buffer reshapes to `(NSINOS, N_ang, N_rad) = (1293, 168, 147)`, planes slowest, radial fastest (`ibin = izm·N_ang·N_rad + ith·N_rad + ir`). The plane index `izm` encodes the michelogram segment. A _segment_ groups a span-wide band of ring differences: with `delta = |r2 − r1|`, the segment magnitude is `incl = floor((delta − 1 + (span+1)/2)/span)`, so segment 0 is the _direct_ band (`delta` near 0), segment ±1 the next band, etc. The code's segment counter is `iseg = 2·incl`, decremented by 1 for negative slope (`r2 < r1`), giving storage order `seg_0, seg_−1, seg_+1, seg_−2, seg_+2, …`. The `NSINOS = 1293` planes are these segments concatenated, each segment contributing fewer planes than the last as the span compression and MRD cutoff (`delta > MRD` is discarded) remove oblique combinations. 
+
+  - The number of angular bins is normally set us half the number of the detectors (crystals) $N_d/2$ since it only ranges from $0$ to $\pi$. 
+
+	- The number of the raidal bins, inside the transverse field of view, is normally $N_{d}+1$. The "+1" arises because radial positions are sampled symmetrically about the central LOR (the line through the scanner axis): with $N_d$ even, the symmetric arrangement yields an odd count $N_d + 1$.
+
+  - The radial axis is in arc coordinates, not uniform distance — and MCGPU-PET does not arc-correct. This matters for reconstruction. The radial bin index `ir` is computed purely from the *crystal-index difference* of the two detectors that fired (`ir = |ix2 − ix1 − NANGLES|`, then centered by `+NRAD/2`); it is never converted to a physical distance. The physical perpendicular distance `s` of a line of response from the scanner axis relates to the crystal-index separation `m` by the chord geometry of a ring of radius `R`: $$s = R\cos\frac{\pi m}{N_{\text{crystals}}}$$ (Radial bins are widest near the center and bunch together toward the edge of the field of view. This nonuniform sampling is the natural "arc" geometry of a ring scanner.) This was verified against the source at both ends: the kernel stores `ir` directly with no remapping, and the export path copies the sinogram buffer from the GPU and gzwrites it to disk untouched (only a sum-for-reporting happens in between). So the file received is in raw, arc-uncorrected coordinates.
+
+  - Consequence for reconstruction. The sinogram has the structure of a Radon transform (axes = view angle $\phi$, signed radial offset $s$). But standard FBP assumes uniformly sampled $s$. Applied to the raw arc-coordinate sinogram, it produces a geometrically distorted image — roughly right near the center, increasingly wrong toward the edge. Two correct paths: (a) arc-correct first — resample each sinogram row from the arc spacing onto a uniform s grid using the cosine map above — then FBP; or (b) use an iterative reconstructor (MLEM/OSEM, as the real scanner uses) that encodes the true arc geometry in its system matrix and consumes the non-arc-corrected data directly, which is preferable because it avoids the noise correlation that resampling introduces. (Caveat on exactness. The cosine mapping is derived from (and consistent with) the crystal-indexing code, but the precise correspondence between a given `ir` and a physical $s$ — including the half-bin offset from the `+NRAD/2` centering and the sign convention — should be confirmed empirically with a point-source simulation (place a source at a known radius, see which radial bin fills) before trusting it for quantitative reconstruction.)
+
 ```
 		seg 0:           159 planes
 		seg ±1 (1,2):    147 each
@@ -349,19 +358,20 @@ To remain integraity, we keep only one file that we edit, and everything else is
   "voxel_space":{
 	"axis_order": "xyz",
     "grid_size_mm": [1.0, 1.0, 1.0],
-    "num_voxels": [100, 100, 140]
+    "num_voxels": [80, 80, 150]
   },
   "scanner":{
 	"symmetry_axis": "z",
-    "axial_length_mm": 148.0,
+    "axial_fov_mm": 150.0,
+    "transaxial_fov_mm": 80.0,
     "radius_mm": 52.5,
     "num_rings": 80,
     "num_detectors_per_ring": 336
   },
   "sinogram":{
     "num_angular_bins": 168,
-    "num_radial_bins": 147,
-    "num_radial_trim": 95,
+    "num_radial_bins": 257,
+    "num_radial_trim": 40,
     "max_ring_difference": 79,
     "span": 11,
     "num_axial_planes": 159
@@ -372,7 +382,7 @@ To remain integraity, we keep only one file that we edit, and everything else is
     "gpu_threads_per_block": 32,
 
     "acquisition_time_s": 600.0,
-    "isotope_mean_life_s": 9978.0,
+    "isotope_mean_life_s": 9502.0,
 
     "psf_filename": "MCGPU_PET.psf",
     "psf_max_elements": 10000000,
@@ -383,9 +393,9 @@ To remain integraity, we keep only one file that we edit, and everything else is
     "tally_voxel_dose": "NO",
     "dose_filename": "mc-gpu_dose.dat",
 
-    "energy_resolution": 0.17,
-    "energy_window_low_eV": 350000.0,
-    "energy_window_high_eV": 600000.0,
+    "energy_resolution": 0.15,
+    "energy_window_low_eV": 358000.0,
+    "energy_window_high_eV": 664000.0,
     "num_energy_bins": 700,
 
     "voxel_space_file": "voxel_space.vox",
@@ -397,7 +407,16 @@ To remain integraity, we keep only one file that we edit, and everything else is
 }
 ```
 
-All fields are pretty much self-explaining. Instead of `phantom_9x9x9cm.vox`, we rename the input `.vox` file to voxel space to avoid ambiguity (phantom + background; or just some voxelized space in general). The "axis_order" and "symmetry_axis" are basically documentation. We adopt the convention where the scanner expand it self from the center of the voxel space. Note that, it may cause a problem for the activity in the voxel space to be outside of the scanner (haven't tried before). 
+ We rename the input `.vox` file from `phantom_9x9x9cm.vox` to `voxel_space.vox` to avoid ambiguity (phantom + background; or just some voxelized space in general). The "axis_order" and "symmetry_axis" declare the interpretation of the coordinate triples; currently only "xyz" is supported and the loader enforces it. We adopt the convention where the scanner expand it self from the center of the voxel space (the negative-radius convention in the `.in`). Activity outside the detector cylinder is emitted but never detected. The validator warns on axial mismatch and on the bounding box exceeding the bore/FOV, but it cannot see where the activity is (that needs the built VoxelGrid), so keeping active regions inside the transaxial FOV is the user's responsibility.
+
+Several fields are coupled — changing one without its partner breaks consistency (the validator will catch most, but understand why):
+
+1. `num_radial_bins = num_detectors_per_ring + 1 − 2·num_radial_trim`. Here 336 + 1 − 80 = 257. Edit trim and bins together.
+2. `num_angular_bins = num_detectors_per_ring / 2 = 168` (convention; only change for angular mashing).
+3. `num_axial_planes = 2·num_rings − 1 = 159`. This is the per-segment plane cap, not the total stored planes (which is NSINOS, derived). 
+
+On the other hand, `num_radial_trim` controls how much of the transverse FOV the sinogram covers, via the nonuniform arc mapping `s = R·cos(π·m/N_crystals)` (not a uniform mm-per-bin)where `R = radius_mm` and `m` is the index separation. With trim 75 → 187 bins, the sinogram covers ~80 mm diameter, matching `transaxial_fov_mm`. Larger trim = smaller FOV coverage but smaller/faster sinograms. The validator warns if coverage falls short of `transaxial_fov_mm`.
+
 
 We write a module `config.py` for loading the json file, checking it for internal contradictions, and computing some derived numbers that the rest of the package needs. If the config is wrong, we want to fail here, loudly, with some helpful messages.
 
@@ -412,6 +431,18 @@ mpw.validate_config(cfg)
 print(mpw.sinogram_shape(cfg))
 print(mpw.segment_table(cfg)[0])
 ```
+
+<details>
+
+The template is dedicated to a specific configuration as stated in the following:
+
+1. The scanner block is a discrete proxy for a continuous-crystal scanner. The real Bruker 7T PET has 3 physical rings of 8 monolithic LYSO blocks with continuous light-distribution decoding and 10-layer DOI — a detector model MCGPU-PET cannot represent. MCGPU-PET requires discrete crystals in discrete rings. So `num_rings`, `num_detectors_per_ring`, `span`, and `max_ring_difference` are not the real hardware; they are a self-consistent discrete stand-in chosen so the sampling is fine enough not to be the bottleneck. What is physically real and must match the scanner: `radius_mm` (52.5), `axial_fov_mm` (150), `transaxial_fov_mm` (80), and the energy fields. Validation is therefore image-domain and scatter-fraction, never sinogram-structure.
+
+2. `energy_window_low_eV` (358000) and `energy_window_high_eV` (664000) are the scanner's real "30%" window, and `energy_resolution` (0.15 = ~15% @ 511 keV) is its real blurring. These three dominate the scatter fraction — the quantity you validate against (6.9% mouse, 14.2% rat). Change them to match a different real acquisition, not to tune results.
+
+3. `isotope_mean_life_s: 9508`: simulating F-18.
+
+</details>
 
 ### 3.2 Voxel Space
 #### 3.2.1 VoxelGrid Class and VoxelSpaceBuilder
@@ -586,7 +617,7 @@ your geometry-mismatch alarm), and reshapes to `(NSINOS, NANGLES, NRAD)`:
 ```python
 sino = mpw.read_sinogram("data/run_0/sinogram_Trues.raw.gz", cfg)
 
-print(sino.shape)   # (1293, 168, 147)
+print(sino.shape)
 ```
 
 The shape order - planes, then angular, then radial - comes straight from how the
@@ -637,6 +668,8 @@ sino = mpw.read_sinogram_segments(sino_path, cfg)
 print(rb.ssrb(sino, cfg).shape)
 print(rb.fore(sino, cfg).shape)
 ```
+
+Note that arc correction is done by default so one doesn't have to worry about it downstream. (You may call `sino = rb.arc_correct(sino, cfg)` to see it explicitly.) If you plan on doing iterative reconstruction later, you may want to turn it off.
 
 ## 4 A Full Run
 

@@ -2,19 +2,20 @@
   "voxel_space":{
 		"axis_order": "xyz",
     "grid_size_mm": [1.0, 1.0, 1.0],
-    "num_voxels": [105, 105, 148]
+    "num_voxels": [80, 80, 150]
   },
   "scanner":{
 		"symmetry_axis": "z",
-    "axial_length_mm": 148.0,
+    "axial_fov_mm": 150.0,
+    "transaxial_fov_mm": 80.0, 
     "radius_mm": 52.5,
     "num_rings": 80,
     "num_detectors_per_ring": 336
   },
   "sinogram":{
     "num_angular_bins": 168,
-    "num_radial_bins": 147,
-    "num_radial_trim": 95,
+    "num_radial_bins": 187,
+    "num_radial_trim": 75,
     "max_ring_difference": 79,
     "span": 11,
     "num_axial_planes": 159
@@ -25,7 +26,7 @@
     "gpu_threads_per_block": 32,
 
     "acquisition_time_s": 600.0,
-    "isotope_mean_life_s": 9978.0,
+    "isotope_mean_life_s": 9502.0,
 
     "psf_filename": "MCGPU_PET.psf",
     "psf_max_elements": 10000000,
@@ -36,9 +37,9 @@
     "tally_voxel_dose": "NO",
     "dose_filename": "mc-gpu_dose.dat",
 
-    "energy_resolution": 0.17,
-    "energy_window_low_eV": 350000.0,
-    "energy_window_high_eV": 600000.0,
+    "energy_resolution": 0.15,
+    "energy_window_low_eV": 358000.0,
+    "energy_window_high_eV": 664000.0,
     "num_energy_bins": 700,
 
     "voxel_space_file": "voxel_space.vox.gz",

@@ -132,7 +132,7 @@ class InFileGenerator:
         m = config["mcgpu"]
 
         radius_cm = sc["radius_mm"] / 10.0
-        axial_fov_cm = sc["axial_length_mm"] / 10.0
+        axial_fov_cm = sc["axial_fov_mm"] / 10.0
         # Detector: X Y Z H RADIUS in cm; negative RADIUS => center on the voxel
         # grid bounding box (MCGPU convention).
         detector_geom = f"0.0 0.0 0.0 {axial_fov_cm} -{radius_cm}"

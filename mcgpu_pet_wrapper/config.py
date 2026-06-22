@@ -13,7 +13,8 @@ Schema (four sections):
 
   scanner : detector hardware
       symmetry_axis          : "z"
-      axial_length_mm        : detector length along the symmetry axis (FOVz)
+      axial_fov_mm        : detector length along the symmetry axis (FOVz)
+      transaxial_fov_mm      : detector length along the transverse axis (FOVxy)
       radius_mm              : detector ring radius
       num_rings              : number of detector rings
       num_detectors_per_ring : crystals per ring
@@ -258,6 +259,29 @@ def sinogram_shape(config):
     }
 
 
+def radial_fov_mm(config):
+    """The transverse FOV diameter actually covered by the radial bins.
+
+    MCGPU-PET's radial coordinate is combinatorial (from the crystal-index
+    difference), and maps to the LOR's perpendicular distance from the axis by
+    the chord relation  s = R * cos(pi * d / NCRYSTALS),  where d is the angular
+    crystal separation. This mapping is NONUNIFORM across the FOV (bins are
+    coarsest at the center, finest near the edge), which is why downstream
+    reconstruction needs arc correction.
+
+    Returns the covered diameter 2*s_max for the retained NRAD bins.
+    """
+    s = config["sinogram"]; sc = config["scanner"]
+    ncryst = sc["num_detectors_per_ring"]
+    nang = s["num_angular_bins"]
+    nrad = s["num_radial_bins"]
+    R = sc["radius_mm"]
+    r_max = nrad // 2
+    d = nang - r_max
+    s_max = R * abs(math.cos(math.pi * d / ncryst))
+    return 2.0 * s_max
+
+
 # ----------------------------------------------------------------------------
 # Validation: config against itself
 # ----------------------------------------------------------------------------
@@ -296,9 +320,13 @@ def _validate_scanner(config):
         )
     if sc["radius_mm"] <= 0:
         raise ValueError(f"scanner.radius_mm must be > 0, got {sc['radius_mm']}.")
-    if sc["axial_length_mm"] <= 0:
+    if sc["axial_fov_mm"] <= 0:
         raise ValueError(
-            f"scanner.axial_length_mm must be > 0, got {sc['axial_length_mm']}."
+            f"scanner.axial_fov_mm must be > 0, got {sc['axial_fov_mm']}."
+        )
+    if sc["transaxial_fov_mm"] <= 0:
+        raise ValueError(
+            f"scanner.transaxial_fov_mm must be > 0, got {sc['transaxial_fov_mm']}."
         )
     if sc["num_rings"] <= 0 or sc["num_detectors_per_ring"] <= 0:
         raise ValueError("scanner.num_rings and num_detectors_per_ring must be > 0.")
@@ -316,6 +344,16 @@ def _validate_sinogram(config):
             f"num_radial_bins={s['num_radial_bins']} but expected {expected_rad} "
             f"= num_detectors_per_ring + 1 - 2*num_radial_trim "
             f"({ndet} + 1 - 2*{s['num_radial_trim']})."
+        )
+    
+    # Coverage: do the retained radial bins span the transaxial FOV?
+    covered = radial_fov_mm(config)
+    fov_xy = sc["transaxial_fov_mm"]
+    if covered < fov_xy - 1e-6:
+        warnings.warn(
+            f"radial bins cover only {covered:.1f} mm diameter but transaxial_fov_mm "
+            f"is {fov_xy:.1f} mm; LORs from the outer FOV are discarded. To cover the "
+            f"full FOV, reduce num_radial_trim (increase num_radial_bins)."
         )
 
     # Angular bins <-> detectors/2 (convention; breakable, e.g. angular mashing).
@@ -360,20 +398,21 @@ def _validate_voxel_space_vs_scanner(config):
     dx, dy, dz = grid_size_mm(config)
 
     # Axial: voxel_space should fill (not exceed) the axial FOV.
-    fov_z = sc["axial_length_mm"]
+    fov_z = sc["axial_fov_mm"]
     if ez > fov_z + 0.5 * dz:
         warnings.warn(
-            f"voxel_space axial extent {ez:.1f} mm exceeds scanner axial length "
+            f"voxel_space axial extent {ez:.1f} mm exceeds scanner axial fov "
             f"{fov_z:.1f} mm; the protruding ends won't be detected."
         )
     elif ez < fov_z - dz:
         warnings.warn(
-            f"voxel_space axial extent {ez:.1f} mm is shorter than scanner axial length "
+            f"voxel_space axial extent {ez:.1f} mm is shorter than scanner axial fov "
             f"{fov_z:.1f} mm; the end rings will see little/no activity."
         )
 
     # Transverse: voxel_space must fit inside the bore (hard) and ideally inside the
     # ring radius (soft, since corners with only air are harmless).
+    # Ideally, voxel space should not exceed the transaxial FOV.
     bore_d = 2.0 * sc["radius_mm"]
     if ex > bore_d or ey > bore_d:
         raise ValueError(
@@ -386,6 +425,12 @@ def _validate_voxel_space_vs_scanner(config):
             f"voxel_space bbox corners reach radius {corner_r:.1f} mm > scanner radius "
             f"{sc['radius_mm']:.1f} mm; corner regions sit outside the detector "
             f"(harmless if they contain only air)."
+        )
+    fov_xy = sc["transaxial_fov_mm"]
+    if ex > fov_xy + 0.5 * dx or ey > fov_xy + 0.5 * dy:
+        warnings.warn(
+            f"voxel_space transverse extent ({ex:.1f} x {ey:.1f} mm) exceeds scanner transaxial length "
+            f"{fov_xy:.1f} mm; the protruding ends won't be detected correctly."
         )
 
 

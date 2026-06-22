@@ -62,7 +62,7 @@ def nema_iq_preclinical(
 
     The voxel count and size come from config['voxel_space'] (via the config
     accessors), so the grid always matches the simulation geometry. The phantom
-    is centered transversely and axially in the voxel-space bounding box, so the
+    is centered transversely and axially in the voxel space bounding box, so the
     50 mm body sits in the middle of the axial extent.
 
     Geometry (standard NEMA NU 4-2008): a 30 mm-diameter, 50 mm-long PMMA
@@ -87,12 +87,12 @@ def nema_iq_preclinical(
     transverse_needed = _IQ_BODY_DIAMETER + 2 * _IQ_WALL_THICKNESS
     if nx * dx < transverse_needed or ny * dy < transverse_needed:
         raise ValueError(
-            f"voxel-space transverse {nx*dx:.1f}x{ny*dy:.1f} mm too small for the "
+            f"voxel space transverse {nx*dx:.1f}x{ny*dy:.1f} mm too small for the "
             f"NEMA IQ phantom (needs >= {transverse_needed:.1f} mm each side)."
         )
     if nz * dz < _IQ_BODY_LENGTH:
         raise ValueError(
-            f"voxel-space axial {nz*dz:.1f} mm too small for the {_IQ_BODY_LENGTH} "
+            f"voxel space axial {nz*dz:.1f} mm too small for the {_IQ_BODY_LENGTH} "
             f"mm NEMA IQ phantom."
         )
 
@@ -100,7 +100,7 @@ def nema_iq_preclinical(
                           material_names=["air", "water/pmma"])
     cx, cy, cz = b.bbox_center_mm
 
-    # Axial layout: center the 50 mm body in the voxel-space axial extent.
+    # Axial layout: center the 50 mm body in the voxel space axial extent.
     z0 = cz - _IQ_BODY_LENGTH / 2.0          # bottom face of the body
     z_body_top = z0 + _IQ_BODY_LENGTH
     body_cz = z0 + _IQ_BODY_LENGTH / 2.0
@@ -160,12 +160,12 @@ def uniform_cylinder(
 
     if nx * dx < diameter_mm or ny * dy < diameter_mm:
         raise ValueError(
-            f"voxel-space transverse {nx*dx:.1f}x{ny*dy:.1f} mm too small for a "
+            f"voxel space transverse {nx*dx:.1f}x{ny*dy:.1f} mm too small for a "
             f"{diameter_mm:.1f} mm cylinder."
         )
     if nz * dz < length_mm:
         raise ValueError(
-            f"voxel-space axial {nz*dz:.1f} mm too small for a {length_mm:.1f} mm "
+            f"voxel space axial {nz*dz:.1f} mm too small for a {length_mm:.1f} mm "
             f"cylinder."
         )
 
