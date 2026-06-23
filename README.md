@@ -375,8 +375,8 @@ To remain integraity, we keep only one file that we edit, and everything else is
   },
   "sinogram":{
     "num_angular_bins": 168,
-    "num_radial_bins": 257,
-    "num_radial_trim": 40,
+    "num_radial_bins": 187,
+    "num_radial_trim": 75,
     "max_ring_difference": 79,
     "span": 11,
     "num_axial_planes": 159
@@ -412,15 +412,15 @@ To remain integraity, we keep only one file that we edit, and everything else is
 }
 ```
 
- We rename the input `.vox` file from `phantom_9x9x9cm.vox` to `voxel_space.vox` to avoid ambiguity (phantom + background; or just some voxelized space in general). The "axis_order" and "symmetry_axis" declare the interpretation of the coordinate triples; currently only "xyz" is supported and the loader enforces it. We adopt the convention where the scanner expand it self from the center of the voxel space (the negative-radius convention in the `.in`). Activity outside the detector cylinder is emitted but never detected. The validator warns on axial mismatch and on the bounding box exceeding the bore/FOV, but it cannot see where the activity is (that needs the built VoxelGrid), so keeping active regions inside the transaxial FOV is the user's responsibility.
+ We rename the input `.vox` file from `phantom_9x9x9cm.vox` to `voxel_space.vox` to avoid ambiguity (phantom + background; or just some voxelized space in general). The "axis_order" and "symmetry_axis" declare the interpretation of the coordinate triples; currently only "xyz" is supported and the loader enforces it. We adopt the convention where the scanner expand it self from the center of the voxel space (the negative-radius convention in the `.in`). Activity outside the detector cylinder is emitted but never detected. The validator warns on axial mismatch and on the bounding box exceeding the bore/FOV (field of view), but it cannot see where the activity is (that needs the built VoxelGrid), so keeping active regions inside the transaxial FOV is the user's responsibility.
 
 Several fields are coupled — changing one without its partner breaks consistency (the validator will catch most, but understand why):
 
-1. `num_radial_bins = num_detectors_per_ring + 1 − 2·num_radial_trim`. Here 336 + 1 − 80 = 257. Edit trim and bins together.
+1. `num_radial_bins = num_detectors_per_ring + 1 − 2·num_radial_trim`. Here 336 + 1 − 150 = 187. Edit trim and bins together.
 2. `num_angular_bins = num_detectors_per_ring / 2 = 168` (convention; only change for angular mashing).
 3. `num_axial_planes = 2·num_rings − 1 = 159`. This is the per-segment plane cap, not the total stored planes (which is NSINOS, derived). 
 
-On the other hand, `num_radial_trim` controls how much of the transverse FOV the sinogram covers, via the nonuniform arc mapping `s = R·cos(π·m/N_crystals)` (not a uniform mm-per-bin)where `R = radius_mm` and `m` is the index separation. With trim 75 → 187 bins, the sinogram covers ~80 mm diameter, matching `transaxial_fov_mm`. Larger trim = smaller FOV coverage but smaller/faster sinograms. The validator warns if coverage falls short of `transaxial_fov_mm`.
+On the other hand, `num_radial_trim` controls how much of the transverse FOV the sinogram covers, via the nonuniform arc mapping `s = R·cos(π·m/N_crystals)` (not a uniform mm-per-bin)where `R = radius_mm` and `m` is the index separation. With trim 75 → 187 bins, the sinogram covers ~80 mm diameter, matching `transaxial_fov_mm`. Larger trim = smaller FOV coverage but smaller/faster sinograms. The validator warns if coverage falls short of `transaxial_fov_mm`. This is needed since it is too distorted outside the FOV and may not be reconstructed correctly. One may call `mpw.radial_fov_mm(cfg)` to check the actual transverse FOV calculated by the assigned raidal_bins/trims.
 
 
 We write a module `config.py` for loading the json file, checking it for internal contradictions, and computing some derived numbers that the rest of the package needs. If the config is wrong, we want to fail here, loudly, with some helpful messages.
