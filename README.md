@@ -720,3 +720,80 @@ print(image.shape)
 sino = mpw.read_sinogram_segments(sino_path, cfg)
 print(sino[5]["data"].shape)
 ```
+
+
+## 5 Sinogram Angular and Radial Conventions
+
+ MCGPU-PET's exported sinogram uses two binning conventions that any downstream reconstruction must account for, neither of which is documented by the simulator and both of which were determined by reading `MCGPU-PET_kernel.cu` and verified empirically with off-axis point sources. First, the **angular axis** sweeps the view angle from **+90° to −90°** over the `num_angular_bins` bins, spanning π but centered on 0° rather than starting at 0°. For an iterative reconstructor (MLEM/OSEM, STIR, parallelproj), it needs to be encoded into the system geometry. For analytic FBP with scikit-image, this is expressed directly by passing `theta = np.linspace(90.0, -90.0, num_angular_bins, endpoint=False)` to `iradon`. (We confirmed this by forward-projecting a known phantom with `radon` under the *same* `theta`: the resulting sinogram overlays MCGPU's exactly, and both reconstruct identically.) 
+ 
+ Try:
+
+ ```python
+ from pathlib import Path
+import mcgpu_pet_wrapper as mpw
+import mcgpu_pet_wrapper.rebinning as rb
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+from skimage.transform import iradon, radon
+from scipy.ndimage import zoom
+
+
+run_dir = "data/run_3"
+run_dir = Path(run_dir)
+
+cfg = mpw.default_config()
+mpw.validate_config(cfg)
+
+voxel_space = mpw.nema_iq_preclinical(cfg)
+
+mpw.build_run(run_dir, cfg, voxel_space)
+mpw.Runner()(run_dir)
+
+
+## ---- plot image ------
+fig, axes = plt.subplots(2, 3, figsize=(21,14))
+
+# load simulation data ---------
+# emission image
+img = mpw.read_emission_image(run_dir / "image_Trues.raw.gz", cfg)
+img = np.sum(img, axis=0)
+axes[1][0].imshow(img, origin="lower")
+axes[1][0].set_title("mcgpu_image")
+
+# sinogram
+sino = mpw.read_sinogram_segments(run_dir / "sinogram_Trues.raw.gz",cfg)
+sino = rb.ssrb(sino, cfg)
+sino = np.sum(sino, axis=0)
+axes[1][1].imshow(sino, origin="lower")
+axes[1][1].set_title("mcgpu_sino")
+
+# Reconstruction
+def fbp(sino) -> np.ndarray:
+    theta = np.linspace(90.0, -90.0, sino.shape[1], endpoint=False)
+    recon = iradon(sino, theta=theta, filter_name='ramp')
+    return recon
+
+recon = fbp(sino.T) # swap angular and radial
+axes[1][2].imshow(recon, origin="lower")
+axes[1][2].set_title("mcgpu_recon")
+
+# load math data -------------
+test_img = img
+axes[0][0].imshow(test_img, origin="lower")
+axes[0][0].set_title("math_truth")
+
+test_sino = radon(test_img, theta=np.linspace(90.0, -90.0, 168, endpoint=False))
+axes[0][1].imshow(zoom(test_sino, (187/80, 1), order=1).T, origin="lower") # for easier comparison visualization
+axes[0][1].set_title("math_sinogram")
+
+test_recon = iradon(test_sino, theta=np.linspace(90.0, -90.0, 168, endpoint=False))
+axes[0][2].imshow(test_recon, origin="lower")
+axes[0][2].set_title("math_recon")
+
+plt.tight_layout()
+plt.savefig(run_dir/"comparison.png")
+ ```
+ 
+Second, the **radial axis is in raw arc coordinates and is not arc-corrected** — the radial bin index maps to the line-of-response's perpendicular distance from the axis by the nonuniform chord relation `s = R·cos(π·m / num_detectors_per_ring)` (bins are widest at the center of the field of view and bunch toward the edge; see `rebinning.arc_correct`). Analytic FBP assumes uniform radial sampling, so the sinogram must be arc-corrected before FBP (or before FORE); an iterative reconstructor should instead model the arc geometry in its system matrix and consume the data uncorrected, which avoids the noise correlation introduced by resampling. Note that while the angular convention above is fully verified, the exact radial mapping — in particular the half-bin centering and overall radial *scale* — has been confirmed in direction but not yet calibrated for absolute metric accuracy; a point source at a known radius should be used to verify `s(ir)` before relying on quantitatively exact radial positions.
