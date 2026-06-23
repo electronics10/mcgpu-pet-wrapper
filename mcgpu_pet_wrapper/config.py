@@ -172,6 +172,14 @@ def segment_table(config):
     span = s["span"]
     nrows = sc["num_rings"]
 
+    # Number of segments MCGPU-PET allocates (read_input's NSEG). The kernel's
+    # per-event `incl` formula can round a ring difference near MRD up to a
+    # segment index BEYOND this count; those events are out of bounds and the
+    # binary drops them. We must apply the same cutoff, or we would invent
+    # spurious single-plane segments at the end (a 2-plane overcount surfaces at
+    # small span, e.g. span=3, though not at span=11 where it happens to align).
+    nseg_alloc = 2 * (mrd // span) + 1
+
     # Aggregate, per iseg, the set of izm and the (iz1+iz2), |iz2-iz1| seen.
     izm_by_seg: dict[int, set] = {}
     sum_by_seg: dict[int, set] = {}
@@ -187,6 +195,9 @@ def segment_table(config):
             iseg = 2 * incl
             if iz2 < iz1 and iseg > 0:
                 iseg -= 1
+            if iseg >= nseg_alloc:
+                # Beyond the allocated segments: MCGPU-PET discards these events.
+                continue
             # cumulative offset of this segment's block (ofseg in the kernel)
             ofseg = iseg * nzs
             for kka in range(0, iseg + 1):
