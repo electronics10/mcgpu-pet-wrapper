@@ -112,7 +112,7 @@ See the sections below for the full walkthrough of every module.
 
 (You may skip this part and will only need to read this if you encounter GPU compatibility problems.)
 
-[MCGPU-PET](https://github.com/DIDSR/MCGPU-PET.git) is a research code; the authors likely developed it by extending NVIDIA CUDA sample programs. Therefore, CUDA samples dependencies such as `helper_functions.h` are essential but not shipped with the distribution. Moreover, since GPU binaries are architecture-specific (unlike x86-64 CPU binaries), distributing a prebuilt `.x` binary is impractical. (Although this is what we ship in the repo, for simplicity, which may cause problems. Continue reading to if you encountered any compatibility problems.)
+[MCGPU-PET](https://github.com/DIDSR/MCGPU-PET.git) is a research code; the authors likely developed it by extending NVIDIA CUDA sample programs. Therefore, CUDA samples dependencies such as `helper_functions.h` are essential but not shipped with the distribution. Moreover, since GPU binaries are architecture-specific (unlike x86-64 CPU binaries), distributing a prebuilt `.x` binary is impractical. (Although this is what we ship in the repo, for simplicity, which may cause problems. Continue reading to if you encounter any compatibility problems.)
 
 ### 1.1 Installation
 
