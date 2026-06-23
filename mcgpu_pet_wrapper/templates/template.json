@@ -9,14 +9,14 @@
     "axial_fov_mm": 150.0,
     "transaxial_fov_mm": 80.0, 
     "radius_mm": 52.5,
-    "num_rings": 70,
+    "num_rings": 75,
     "num_detectors_per_ring": 336
   },
   "sinogram":{
     "num_angular_bins": 168,
     "num_radial_bins": 187,
     "num_radial_trim": 75,
-    "max_ring_difference": 79,
+    "max_ring_difference": 74,
     "span": 3,
     "num_axial_planes": 149
   },
