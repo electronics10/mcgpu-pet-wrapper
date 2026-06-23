@@ -21,6 +21,3 @@ data/
 *.raw.gz
 *.psf
 MCGPU-PET.out
-
-# developer
-test.py

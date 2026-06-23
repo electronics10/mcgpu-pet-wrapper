@@ -363,14 +363,14 @@ To remain integraity, we keep only one file that we edit, and everything else is
   "voxel_space":{
 	"axis_order": "xyz",
     "grid_size_mm": [1.0, 1.0, 1.0],
-    "num_voxels": [80, 80, 150]
+    "num_voxels": [80, 80, 149]
   },
   "scanner":{
 	"symmetry_axis": "z",
     "axial_fov_mm": 150.0,
     "transaxial_fov_mm": 80.0,
     "radius_mm": 52.5,
-    "num_rings": 80,
+    "num_rings": 70,
     "num_detectors_per_ring": 336
   },
   "sinogram":{
@@ -379,7 +379,7 @@ To remain integraity, we keep only one file that we edit, and everything else is
     "num_radial_trim": 75,
     "max_ring_difference": 79,
     "span": 11,
-    "num_axial_planes": 159
+    "num_axial_planes": 149
   },
   "mcgpu": {
     "random_seed": 0,
@@ -418,7 +418,7 @@ Several fields are coupled — changing one without its partner breaks consisten
 
 1. `num_radial_bins = num_detectors_per_ring + 1 − 2·num_radial_trim`. Here 336 + 1 − 150 = 187. Edit trim and bins together.
 2. `num_angular_bins = num_detectors_per_ring / 2 = 168` (convention; only change for angular mashing).
-3. `num_axial_planes = 2·num_rings − 1 = 159`. This is the per-segment plane cap, not the total stored planes (which is NSINOS, derived). 
+3. `num_axial_planes = 2·num_rings − 1 = 149`. This is the per-segment plane cap, not the total stored planes (which is NSINOS, derived). 
 
 On the other hand, `num_radial_trim` controls how much of the transverse FOV the sinogram covers, via the nonuniform arc mapping `s = R·cos(π·m/N_crystals)` (not a uniform mm-per-bin)where `R = radius_mm` and `m` is the index separation. With trim 75 → 187 bins, the sinogram covers ~80 mm diameter, matching `transaxial_fov_mm`. Larger trim = smaller FOV coverage but smaller/faster sinograms. The validator warns if coverage falls short of `transaxial_fov_mm`. This is needed since it is too distorted outside the FOV and may not be reconstructed correctly. One may call `mpw.radial_fov_mm(cfg)` to check the actual transverse FOV calculated by the assigned raidal_bins/trims.
 

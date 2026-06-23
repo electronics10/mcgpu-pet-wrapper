@@ -2,14 +2,14 @@
   "voxel_space":{
 		"axis_order": "xyz",
     "grid_size_mm": [1.0, 1.0, 1.0],
-    "num_voxels": [80, 80, 150]
+    "num_voxels": [80, 80, 149]
   },
   "scanner":{
 		"symmetry_axis": "z",
     "axial_fov_mm": 150.0,
     "transaxial_fov_mm": 80.0, 
     "radius_mm": 52.5,
-    "num_rings": 80,
+    "num_rings": 70,
     "num_detectors_per_ring": 336
   },
   "sinogram":{
@@ -17,8 +17,8 @@
     "num_radial_bins": 187,
     "num_radial_trim": 75,
     "max_ring_difference": 79,
-    "span": 11,
-    "num_axial_planes": 159
+    "span": 3,
+    "num_axial_planes": 149
   },
   "mcgpu": {
     "random_seed": 0,
