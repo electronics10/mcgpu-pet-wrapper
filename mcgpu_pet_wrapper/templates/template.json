@@ -17,7 +17,7 @@
     "num_radial_bins": 187,
     "num_radial_trim": 75,
     "max_ring_difference": 74,
-    "span": 3,
+    "span": 11,
     "num_axial_planes": 149
   },
   "mcgpu": {
