@@ -724,7 +724,7 @@ print(sino[5]["data"].shape)
 
 ## 5 Sinogram Angular and Radial Conventions
 
- MCGPU-PET's exported sinogram uses two binning conventions that any downstream reconstruction must account for, neither of which is documented by the simulator and both of which were determined by reading `MCGPU-PET_kernel.cu` and verified empirically with off-axis point sources. First, the **angular axis** sweeps the view angle from **+90° to −90°** over the `num_angular_bins` bins, spanning π but centered on 0° rather than starting at 0°. For an iterative reconstructor (MLEM/OSEM, STIR, parallelproj), it needs to be encoded into the system geometry. For analytic FBP with scikit-image, this is expressed directly by passing `theta = np.linspace(90.0, -90.0, num_angular_bins, endpoint=False)` to `iradon`. (We confirmed this by forward-projecting a known phantom with `radon` under the *same* `theta`: the resulting sinogram overlays MCGPU's exactly, and both reconstruct identically.) 
+ MCGPU-PET's exported sinogram uses two binning conventions that any downstream reconstruction must account for, neither of which is documented by the simulator and both of which were determined by reading `MCGPU-PET_kernel.cu` and verified empirically with off-axis point sources. First, the **angular axis** sweeps the view angle from **+90° to −90°** over the `num_angular_bins` bins, spanning π but centered on 0° rather than starting at 0°. (Numpy rolling won't necessarily fix the problem since the interval is half a period ($\pi$ instead of $2\pi$) and will cause discontinuity.) For an iterative reconstructor (MLEM/OSEM, STIR, parallelproj), it needs to be encoded into the system geometry. For analytic FBP with scikit-image, this is expressed directly by passing `theta = np.linspace(90.0, -90.0, num_angular_bins, endpoint=False)` to `iradon`. (We confirmed this by forward-projecting a known phantom with `radon` under the *same* `theta`: the resulting sinogram overlays MCGPU's exactly, and both reconstruct identically.) 
  
  Try:
 
@@ -784,11 +784,11 @@ test_img = img
 axes[0][0].imshow(test_img, origin="lower")
 axes[0][0].set_title("math_truth")
 
-test_sino = radon(test_img, theta=np.linspace(90.0, -90.0, 168, endpoint=False))
+test_sino = radon(test_img, theta=np.linspace(90.0, -90.0, sino.shape[0], endpoint=False))
 axes[0][1].imshow(zoom(test_sino, (187/80, 1), order=1).T, origin="lower") # for easier comparison visualization
 axes[0][1].set_title("math_sinogram")
 
-test_recon = iradon(test_sino, theta=np.linspace(90.0, -90.0, 168, endpoint=False))
+test_recon = iradon(test_sino, theta=np.linspace(90.0, -90.0, sino.shape[0], endpoint=False))
 axes[0][2].imshow(test_recon, origin="lower")
 axes[0][2].set_title("math_recon")
 
@@ -796,4 +796,4 @@ plt.tight_layout()
 plt.savefig(run_dir/"comparison.png")
  ```
  
-Second, the **radial axis is in raw arc coordinates and is not arc-corrected** — the radial bin index maps to the line-of-response's perpendicular distance from the axis by the nonuniform chord relation `s = R·cos(π·m / num_detectors_per_ring)` (bins are widest at the center of the field of view and bunch toward the edge; see `rebinning.arc_correct`). Analytic FBP assumes uniform radial sampling, so the sinogram must be arc-corrected before FBP (or before FORE); an iterative reconstructor should instead model the arc geometry in its system matrix and consume the data uncorrected, which avoids the noise correlation introduced by resampling. Note that while the angular convention above is fully verified, the exact radial mapping — in particular the half-bin centering and overall radial *scale* — has been confirmed in direction but not yet calibrated for absolute metric accuracy; a point source at a known radius should be used to verify `s(ir)` before relying on quantitatively exact radial positions.
+Second, the **radial axis is in raw arc coordinates and is not arc-corrected** — the radial bin index maps to the line-of-response's perpendicular distance from the axis by the nonuniform chord relation `s = R·cos(π·m / num_detectors_per_ring)` (bins are widest at the center of the field of view and bunch toward the edge; see `rebinning.arc_correct`). Analytic FBP assumes uniform radial sampling, so the sinogram must be arc-corrected before FBP (or before FORE); an iterative reconstructor should instead model the arc geometry in its system matrix and consume the data uncorrected, which avoids the noise correlation introduced by resampling. Note that while the angular convention above is fully verified, the exact radial mapping — in particular the half-bin centering and overall radial *scale* — has been confirmed in direction but not yet calibrated for absolute metric accuracy; a point source at a known radius should be used to verify `s(ir)` before relying on quantitatively exact radial positions. (It appears to be correct, though.)
