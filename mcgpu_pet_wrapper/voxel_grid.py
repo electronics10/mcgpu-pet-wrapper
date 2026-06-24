@@ -21,6 +21,7 @@ The builder accepts activity as Bq/mL (physicist-native) and converts.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -229,6 +230,79 @@ class VoxelSpaceBuilder:
         Y = self._y[js][None, :, None]
         Z = self._z[ks][:, None, None]
         local = (X - cx) ** 2 + (Y - cy) ** 2 + (Z - cz) ** 2 <= radius_mm ** 2
+        if not local.any():
+            return 0
+        full = np.zeros_like(self.material_id, dtype=bool)
+        full[ks, js, is_] = local
+        return self._paint(full, material_id, density, activity_Bq_per_mL)
+
+    def add_elliptic_cylinder(self, center_mm, rx_mm, ry_mm, height_mm,
+                              axis: Literal["x", "y", "z"] = "z", *,
+                              theta_deg: float = 0.0, material_id, density,
+                              activity_Bq_per_mL: float = 0.0) -> int:
+        """Elliptical cylinder, axis-aligned along `axis`, with optional in-plane
+        rotation `theta_deg` (right-handed about `axis`) of the elliptical cross
+        section. center_mm=(x,y,z); rx_mm, ry_mm are the cross-section semi-axes
+        in the two coordinates perpendicular to `axis`, in their natural order
+        (axis z -> (x, y); axis x -> (y, z); axis y -> (z, x)).
+
+        Reduces exactly to add_cylinder when rx_mm == ry_mm (and theta is then
+        irrelevant). theta_deg has no effect on a circular cross section.
+        """
+        if rx_mm <= 0 or ry_mm <= 0 or height_mm <= 0:
+            raise ValueError("rx_mm, ry_mm and height_mm must be > 0")
+        cx, cy, cz = center_mm
+        half = height_mm / 2.0
+        rmax = max(rx_mm, ry_mm)  # safe (over-)estimate of the rotated AABB
+        if axis == "z":
+            bb = (cx - rmax, cx + rmax, cy - rmax, cy + rmax, cz - half, cz + half)
+        elif axis == "x":
+            bb = (cx - half, cx + half, cy - rmax, cy + rmax, cz - rmax, cz + rmax)
+        elif axis == "y":
+            bb = (cx - rmax, cx + rmax, cy - half, cy + half, cz - rmax, cz + rmax)
+        else:
+            raise ValueError(f"axis must be 'x','y','z'; got {axis!r}")
+
+        ks, js, is_ = self._bbox_slices(*bb)
+        X = self._x[is_][None, None, :]
+        Y = self._y[js][None, :, None]
+        Z = self._z[ks][:, None, None]
+        t = math.radians(theta_deg)
+        ct, st = math.cos(t), math.sin(t)
+        if axis == "z":
+            u, v = X - cx, Y - cy
+            within = np.abs(Z - cz) <= half
+        elif axis == "x":
+            u, v = Y - cy, Z - cz
+            within = np.abs(X - cx) <= half
+        else:  # y: perpendicular coords are (z, x)
+            u, v = Z - cz, X - cx
+            within = np.abs(Y - cy) <= half
+        ur = u * ct + v * st       # rotate by -theta into ellipse frame
+        vr = -u * st + v * ct
+        cross = (ur / rx_mm) ** 2 + (vr / ry_mm) ** 2 <= 1.0
+        local = cross & within
+        if not local.any():
+            return 0
+        full = np.zeros_like(self.material_id, dtype=bool)
+        full[ks, js, is_] = local
+        return self._paint(full, material_id, density, activity_Bq_per_mL)
+
+    def add_ellipsoid(self, center_mm, semi_axes_mm: tuple[float, float, float], 
+                      material_id, density, activity_Bq_per_mL: float = 0.0) -> int:
+        """Axis-aligned ellipsoid. semi_axes_mm=(ax, ay, az) along x, y, z.
+        Reduces to add_sphere when ax == ay == az."""
+        ax, ay, az = semi_axes_mm
+        if ax <= 0 or ay <= 0 or az <= 0:
+            raise ValueError("all semi-axes must be > 0")
+        cx, cy, cz = center_mm
+        ks, js, is_ = self._bbox_slices(cx - ax, cx + ax, cy - ay, cy + ay,
+                                        cz - az, cz + az)
+        X = self._x[is_][None, None, :]
+        Y = self._y[js][None, :, None]
+        Z = self._z[ks][:, None, None]
+        local = (((X - cx) / ax) ** 2 + ((Y - cy) / ay) ** 2
+                 + ((Z - cz) / az) ** 2 <= 1.0)
         if not local.any():
             return 0
         full = np.zeros_like(self.material_id, dtype=bool)

@@ -25,7 +25,7 @@
     "gpu_number": 0,
     "gpu_threads_per_block": 32,
 
-    "acquisition_time_s": 600.0,
+    "acquisition_time_s": 100.0,
     "isotope_mean_life_s": 9502.0,
 
     "psf_filename": "MCGPU_PET.psf",
