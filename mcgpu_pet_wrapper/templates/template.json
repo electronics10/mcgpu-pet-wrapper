@@ -45,7 +45,9 @@
     "voxel_space_file": "voxel_space.vox.gz",
     "materials": [
       "materials/air_5-515keV.mcgpu.gz",
-      "materials/water_5-515keV.mcgpu.gz"
+      "materials/water_5-515keV.mcgpu.gz",
+      "materials/adipose_ICRP110_5-515keV.mcgpu.gz",
+      "materials/spongiosa_ICRP110_5-515keV.mcgpu.gz"
     ]
   }
 }

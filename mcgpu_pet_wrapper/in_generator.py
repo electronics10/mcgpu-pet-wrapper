@@ -66,9 +66,12 @@ SCHEMA: dict[str, tuple[str, int]] = {
 
     "voxel_space_file":      ("VOXELIZED GEOMETRY FILE", 0),
 
-    "material1_file":        ("MATERIAL FILE LIST", 0),
-    "material2_file":        ("MATERIAL FILE LIST", 1),
+    # NOTE: the MATERIAL FILE LIST is variable-length (1..MAX_MATERIALS files),
+    # so it is NOT addressed here by fixed index. It is written separately by
+    # _write_materials, which rewrites the section body with one line per file.
 }
+
+MAX_MATERIALS = 15  # MCGPU-PET: #define MAX_MATERIALS 15
 
 _SECTION_RE = re.compile(r'^\s*#\[SECTION (.+?)\]')
 _VALUE_COLUMN = 31  # cosmetic comment alignment
@@ -123,6 +126,55 @@ class InFileGenerator:
     def from_config(self, config: dict) -> None:
         validate_config(config)
         self.apply(self._translate(config))
+        self._write_materials(config["mcgpu"]["materials"])
+
+    def _write_materials(self, materials) -> None:
+        """Write the MATERIAL FILE LIST section body: one line per material file,
+        in order, numbered. Material ID k in the .vox refers to the k-th file
+        here (1-based). The list is variable length; MCGPU reads until EOF or
+        MAX_MATERIALS, skipping comment-only lines.
+
+        We locate the section header line, then replace everything from the line
+        after it up to the next section header (or the END marker / EOF) with the
+        freshly generated material lines, preserving the header and trailing
+        comment lines.
+        """
+        if not 1 <= len(materials) <= MAX_MATERIALS:
+            raise ValueError(
+                f"materials has {len(materials)} entries; MCGPU-PET supports "
+                f"1..{MAX_MATERIALS}."
+            )
+
+        # find the MATERIAL FILE LIST header line
+        hdr = None
+        for i, line in enumerate(self.lines):
+            m = _SECTION_RE.match(line)
+            if m and m.group(1).split(' v.')[0].strip() == "MATERIAL FILE LIST":
+                hdr = i
+                break
+        if hdr is None:
+            raise KeyError("template.in has no 'MATERIAL FILE LIST' section.")
+
+        # everything from hdr+1 to the END marker is the section body we replace.
+        # find where the body ends: the END marker line, or EOF.
+        end = len(self.lines)
+        for j in range(hdr + 1, len(self.lines)):
+            if self.lines[j].lstrip().startswith("# >>>> END"):
+                end = j
+                break
+
+        # build the new material lines
+        width = 45  # filename column width before the "# N" comment
+        mat_lines = []
+        for k, fname in enumerate(materials, start=1):
+            fname = str(fname)
+            pad = max(width - len(fname), 1)
+            mat_lines.append(f"{fname}{' ' * pad}# {k}")
+
+        # splice: keep [..hdr], insert mat_lines, keep [end..] (END marker onward)
+        self.lines = self.lines[: hdr + 1] + mat_lines + self.lines[end:]
+        # rebuild index since line numbers shifted (materials are last, but be safe)
+        self._index = self._build_index()
 
     @staticmethod
     def _translate(config: dict) -> dict[str, Any]:
@@ -189,9 +241,6 @@ class InFileGenerator:
             "span":                  sg["span"],
 
             "voxel_space_file":      m["voxel_space_file"],
-
-            "material1_file":        m["materials"][0],
-            "material2_file":        m["materials"][1],
         }
 
     def write(self, run_dir: str | Path) -> Path:

@@ -63,8 +63,6 @@ phantom_9x9x9cm.vox          # VOXEL GEOMETRY FILE (penEasy 2008 format; .gz acc
 
 
 #[SECTION MATERIAL FILE LIST v.2009-11-30]  
-./materials/air_5-515keV.mcgpu.gz             # 1
-./materials/water_5-515keV.mcgpu.gz           # 2
-#
+# (material file lines are written here by in_generator, one per material)
 #
 # >>>> END INPUT FILE >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

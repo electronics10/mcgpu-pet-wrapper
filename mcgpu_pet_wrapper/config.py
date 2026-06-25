@@ -458,10 +458,11 @@ def _validate_mcgpu(m):
             f"isotope_mean_life_s must be > 0, got {m.get('isotope_mean_life_s')}."
         )
     mats = m.get("materials", [])
-    if len(mats) != 2:
+    if not 1 <= len(mats) <= 15:
         raise ValueError(
-            f"materials has {len(mats)} entries; the .in template supports 2. To "
-            f"extend, add material lines to template.in and the generator schema."
+            f"materials has {len(mats)} entries; MCGPU-PET supports 1..15 "
+            f"(#define MAX_MATERIALS 15). Material ID k in the .vox refers to the "
+            f"k-th file in this list."
         )
     for flag in ("tally_material_dose", "tally_voxel_dose"):
         v = m.get(flag, "NO")
