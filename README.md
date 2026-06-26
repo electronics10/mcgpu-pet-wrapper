@@ -1,4 +1,4 @@
-**Current version:** v0.1.0
+![GitHub release](https://img.shields.io/github/v/release/electronics10/mcgpu-pet-wrapper)
 
 ## Introduction
 This is a Python wrapper which wraps MCGPU-PET (Badal et al., Comput. Phys. Commun. 295 (2024) 109008, doi:10.1016/j.cpc.2023.109008), developed at the US FDA and in the public domain (17 U.S.C. §105). The bundled MCGPU-PET.x binary and the simulation engine are their work; this repository adds a Python configuration, phantom-building, and I/O layer. If you use this in published work, please cite the original MCGPU-PET paper.
