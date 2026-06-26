@@ -367,6 +367,17 @@ def _validate_sinogram(config):
             f"full FOV, reduce num_radial_trim (increase num_radial_bins)."
         )
 
+    # Over-coverage: retained bins reach beyond the declared FOV. Not a
+    # correctness problem (no LORs lost) -- just larger sinograms, and the
+    # outermost bins are the most arc-distorted.
+    if covered > fov_xy * 1.05:
+        warnings.warn(
+            f"radial bins cover {covered:.1f} mm diameter, beyond "
+            f"transaxial_fov_mm={fov_xy:.1f} mm; the extra outer bins are the most "
+            f"arc-distorted and enlarge the sinogram. Consider increasing num_radial_trim to "
+            f"tighten coverage to the FOV."
+        )
+
     # Angular bins <-> detectors/2 (convention; breakable, e.g. angular mashing).
     half = ndet // 2
     if s["num_angular_bins"] != half:
