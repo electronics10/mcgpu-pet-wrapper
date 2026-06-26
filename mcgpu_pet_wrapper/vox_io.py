@@ -68,7 +68,7 @@ class VoxFileGenerator:
         return out
 
 
-def read_vox(path) -> VoxelGrid:
+def read_vox(path, config=None) -> VoxelGrid:
     """Parse a .vox (or .vox.gz) back into a voxel space. Used for round-trip tests
     and re-loading recorded runs."""
     path = Path(path)
@@ -94,10 +94,21 @@ def read_vox(path) -> VoxelGrid:
         p = l.split()
         mat[idx] = int(p[0]); rho[idx] = float(p[1]); act[idx] = float(p[2])
 
+    mat_names = []
+    if config is not None:
+        mats = config["mcgpu"]["materials"]      # 1-based: id k -> mats[k-1]
+        max_id = int(mat.max())
+        if max_id > len(mats):
+            raise ValueError(
+                f"{path} references material id {max_id} but config lists only "
+                f"{len(mats)} materials.")
+        mat_names = list(mats)
+
     shape = (nz, ny, nx)
     return VoxelGrid(
         material_id=mat.reshape(shape, order="C"),
         density=rho.reshape(shape, order="C"),
         activity=act.reshape(shape, order="C"),
         grid_size_mm=(dx, dy, dz),
+        material_names=mat_names
     )
