@@ -652,6 +652,7 @@ Note that arc correction is done by default so one doesn't have to worry about i
 ```python
 import mcgpu_pet_wrapper as mpw
 
+
 run_dir = "data/run_0"
 
 # Load configuration
