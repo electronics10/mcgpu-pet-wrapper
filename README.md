@@ -659,7 +659,7 @@ cfg = mpw.default_config()
 mpw.validate_config(cfg)
 
 # Define voxel space object
-voxel_space = mpw.point_source(cfg)
+voxel_space = mpw.point_source(cfg, offset_mm=(15, 25, 0))
 
 # Build simulation directory and files
 mpw.build_run(run_dir, cfg, voxel_space)
@@ -675,7 +675,7 @@ import mcgpu_pet_wrapper as mpw
 
 
 run_dir = "data/run_0"
-cfg_path = run_dir + "config.json"
+cfg_path = run_dir + "/config.json"
 img_path = run_dir + "/image_Trues.raw.gz"
 sino_path = run_dir + "/sinogram_Trues.raw.gz"
 
@@ -756,8 +756,9 @@ axes[0][2].imshow(test_recon, origin="lower")
 axes[0][2].set_title("math_fbp")
 
 plt.tight_layout()
-plt.savefig(run_dir / f"comparison{i}.png")
+plt.savefig(run_dir / "comparison.png")
 plt.close()
+print("Figure save to data/run_0/comparison.png")
 ```
  
 Second, the **radial axis is in raw arc coordinates and is not arc-corrected** — the radial bin index maps to the line-of-response's perpendicular distance from the axis by the nonuniform chord relation `s = R·cos(π·m / num_detectors_per_ring)` (bins are widest at the center of the field of view and bunch toward the edge; see `rebinning.arc_correct`). Analytic FBP assumes uniform radial sampling, so the sinogram must be arc-corrected before FBP (or before FORE); an iterative reconstructor should instead model the arc geometry in its system matrix and consume the data uncorrected, which avoids the noise correlation introduced by resampling. Note that while the angular convention above is fully verified, the exact radial mapping — in particular the half-bin centering and overall radial *scale* — has been confirmed in direction but not yet calibrated for absolute metric accuracy; a point source at a known radius should be used to verify `s(ir)` before relying on quantitatively exact radial positions. (It appears to be correct, though.)
