@@ -593,6 +593,7 @@ of values matches what the config predicts (raising a clear error if not - that 
 your geometry-mismatch alarm), and reshapes to `(NSINOS, NANGLES, NRAD)`:
 
 ```python
+cfg = mpw.load_config("data/run_0/config.json")
 sino = mpw.read_sinogram("data/run_0/sinogram_Trues.raw.gz", cfg)
 
 print(sino.shape)
