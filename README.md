@@ -473,7 +473,7 @@ it mainly to confirm a round-trip: write a phantom, read it back, check it is
 identical. It is also handy for re-loading a recorded run.
 
 ```python
-vox = mpw.read_vox("data/run_0/" + cfg["mcgpu"]["voxel_space_file"])
+vox = mpw.read_vox("data/run_0/" + cfg["mcgpu"]["voxel_space_file"], cfg)
 
 print(vox.shape_zyx)
 ```
