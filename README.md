@@ -308,7 +308,7 @@ materials/air_5-515keV.mcgpu.gz             # 1
 materials/water_5-515keV.mcgpu.gz           # 2
 ```
 
-- There are only two materials, namely air and water, shipped in the github repository of MCGPU-PET.
+- There are only two materials, namely air and water, used in the sample (example).
 - This is mostly fine — but the reason it's fine is specific, and there's one caveat. MCGPU-PET explicitly checks that each material's cross-section table extends up to the annihilation energy (511 keV) and aborts with an error otherwise. At 511 keV in light tissue, Compton (incoherent) scattering dominates every other photon process — photoelectric and Rayleigh are smaller by roughly two orders of magnitude. The Compton interaction rate per unit volume is governed by electron density: $$n_e = \rho \cdot \frac{Z}{A} \cdot N_A.$$For soft tissues $Z/A$ is nearly constant (water 0.555, muscle ~0.550, fat ~0.557 — all within ~1%). So once you scale water by the right $\rho$, you reproduce the correct electron density, and therefore the correct scatter behavior, to ~1% for any soft tissue. The clinical world relies on exactly this: PET attenuation correction maps CT to 511 keV with a bilinear water/bone rule, because soft tissue tracks water and only bone needs a separate anchor. The one caveat: bone. Cortical bone has $Z/A \approx 0.53$ (lower than water) and higher effective $Z$. Two consequences: First, using water composition at bone density slightly _overestimates_ electron density (by the $Z/A$ ratio, ~4–5%), hence overestimates Compton/scatter in those voxels. Secondly, the small residual photoelectric/coherent contribution that bone's higher-$Z$ elements (Ca, P) add is missed. For preclinical mouse imaging this is a minor effect: bone is thin, low-volume, and the scatter sinogram is a smooth quantity that integrates over the whole body, so a few-percent error confined to bone voxels largely averages out. MCGPU-PET's own validation is only quoted as ~10% agreement against GATE/PeneloPET, so a bone-composition error well under that is in the noise.
 
 - Baically, water + per-voxel density is enough. Treat density as a heterogeneity knob. (If you later want bone fidelity or generalization to bony/contrast-bearing regions: generate a proper bone material valid to 511 keV with PENELOPE's material program, and assign bone voxels that material rather than up-scaling water density.)
@@ -403,7 +403,7 @@ For example:
 import mcgpu_pet_wrapper as mpw
 
 
-cfg = mpw.load_config("mcgpu_pet_wrapper/templates/template.json")
+cfg = mpw.default_config()
 mpw.validate_config(cfg)
 
 print(mpw.sinogram_shape(cfg))
@@ -557,7 +557,7 @@ Painting shapes by hand is fine for experiments, but for real work you may want 
 Its geometry (all standard, baked into the function): a 30 mm-wide, 50 mm-long plastic (PMMA) cylinder, with three regions stacked along its length - five hot rods of increasing diameter (1 to 5 mm) at one end, a uniform hot region in the middle, and two "cold" inserts (one water, one air, no activity) at the other end.
 
 ```python
-cfg = mpw.load_config("mcgpu_pet_wrapper/templates/template.json")
+cfg = mpw.default_config()
 
 voxel_space = mpw.nema_iq_preclinical(cfg, hot_activity_Bq_per_mL=37000.0)
 
@@ -605,6 +605,7 @@ that code to get it right rather than guessing.
 `read_sinogram_segments` splits the flat sinogram into per-segment 3D arrays with their ring-difference and axial labelling. You get a list of clean, labelled per-segment sinograms instead of one opaque stack.
 
 ```python
+cfg = mpw.load_config("data/run_0/config.json")
 sino = mpw.read_sinogram_segments("data/run_0/sinogram_Trues.raw.gz", cfg)
 
 print(sino[5]["data"].shape)
@@ -633,15 +634,12 @@ The rebinning is not part of the core wrapper. Not going to the technical detail
 import mcgpu_pet_wrapper as mpw
 from mcgpu_pet_wrapper import rebinning as rb
 
-cfg_path = "mcgpu_pet_wrapper/templates/template.json"
-run_dir = "data/run_0"
-sino_path = run_dir + "/sinogram_Trues.raw.gz"
 
 # Load configuration
-cfg = mpw.load_config(cfg_path)
+cfg = mpw.load_config("data/run_0/config.json")
 
 # Load sinogram segments
-sino = mpw.read_sinogram_segments(sino_path, cfg)
+sino = mpw.read_sinogram_segments("data/run_0/sinogram_Trues.raw.gz", cfg)
 
 print(rb.ssrb(sino, cfg).shape)
 print(rb.fore(sino, cfg).shape)
@@ -654,12 +652,11 @@ Note that arc correction is done by default so one doesn't have to worry about i
 ```python
 import mcgpu_pet_wrapper as mpw
 
-
-cfg_path = "mcgpu_pet_wrapper/templates/template.json"
 run_dir = "data/run_0"
 
 # Load configuration
-cfg = mpw.load_config(cfg_path)
+cfg = mpw.default_config()
+mpw.validate_config(cfg)
 
 # Define voxel space object
 voxel_space = mpw.point_source(cfg)
@@ -677,8 +674,8 @@ To read the data, try:
 import mcgpu_pet_wrapper as mpw
 
 
-cfg_path = "mcgpu_pet_wrapper/templates/template.json"
 run_dir = "data/run_0"
+cfg_path = run_dir + "config.json"
 img_path = run_dir + "/image_Trues.raw.gz"
 sino_path = run_dir + "/sinogram_Trues.raw.gz"
 
@@ -701,8 +698,8 @@ print(sino[5]["data"].shape)
  
  Try:
 
- ```python
- from pathlib import Path
+```python
+from pathlib import Path
 import mcgpu_pet_wrapper as mpw
 import mcgpu_pet_wrapper.rebinning as rb
 
@@ -712,17 +709,9 @@ import numpy as np
 from skimage.transform import iradon, radon
 from scipy.ndimage import zoom
 
-
-run_dir = "data/run_3"
+run_dir = "data/run_0"
 run_dir = Path(run_dir)
-
-cfg = mpw.default_config()
-mpw.validate_config(cfg)
-
-voxel_space = mpw.nema_iq_preclinical(cfg)
-
-mpw.build_run(run_dir, cfg, voxel_space)
-mpw.Runner()(run_dir)
+cfg = mpw.load_config(run_dir / "config.json")
 
 
 ## ---- plot image ------
@@ -750,7 +739,7 @@ def fbp(sino) -> np.ndarray:
 
 recon = fbp(sino.T) # swap angular and radial
 axes[1][2].imshow(recon, origin="lower")
-axes[1][2].set_title("mcgpu_recon")
+axes[1][2].set_title("mcgpu_fbp")
 
 # load math data -------------
 test_img = img
@@ -758,15 +747,17 @@ axes[0][0].imshow(test_img, origin="lower")
 axes[0][0].set_title("math_truth")
 
 test_sino = radon(test_img, theta=np.linspace(90.0, -90.0, sino.shape[0], endpoint=False))
-axes[0][1].imshow(zoom(test_sino, (187/80, 1), order=1).T, origin="lower") # for easier comparison visualization
+factor = sino.shape[1] / cfg["scanner"]["transaxial_fov_mm"]
+axes[0][1].imshow(zoom(test_sino, (factor, 1), order=1).T, origin="lower") # for easier comparison visualization
 axes[0][1].set_title("math_sinogram")
 
 test_recon = iradon(test_sino, theta=np.linspace(90.0, -90.0, sino.shape[0], endpoint=False))
 axes[0][2].imshow(test_recon, origin="lower")
-axes[0][2].set_title("math_recon")
+axes[0][2].set_title("math_fbp")
 
 plt.tight_layout()
-plt.savefig(run_dir/"comparison.png")
- ```
+plt.savefig(run_dir / f"comparison{i}.png")
+plt.close()
+```
  
 Second, the **radial axis is in raw arc coordinates and is not arc-corrected** — the radial bin index maps to the line-of-response's perpendicular distance from the axis by the nonuniform chord relation `s = R·cos(π·m / num_detectors_per_ring)` (bins are widest at the center of the field of view and bunch toward the edge; see `rebinning.arc_correct`). Analytic FBP assumes uniform radial sampling, so the sinogram must be arc-corrected before FBP (or before FORE); an iterative reconstructor should instead model the arc geometry in its system matrix and consume the data uncorrected, which avoids the noise correlation introduced by resampling. Note that while the angular convention above is fully verified, the exact radial mapping — in particular the half-bin centering and overall radial *scale* — has been confirmed in direction but not yet calibrated for absolute metric accuracy; a point source at a known radius should be used to verify `s(ir)` before relying on quantitatively exact radial positions. (It appears to be correct, though.)
