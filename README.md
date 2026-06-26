@@ -520,7 +520,7 @@ It also keeps the filename in sync between the `.vox` file and the `.in`
 file.
 
 ```python
-mpw.build_run("data/run_1", cfg, voxel_space)
+mpw.build_run("data/run_0", cfg, voxel_space)
 ```
 
 `Runner()(run_dir)` does the actual run. It symlinks the binary and the
@@ -529,7 +529,7 @@ materials folder into the directory, checks all required files are present, runs
 collects the output files into a tidy `RunResult` object:
 
 ```python
-result = mpw.Runner()("data/run_1", on_existing="error")
+result = mpw.Runner()("data/run_0", on_existing="error")
 
 print(result.sinogram_trues)    # path to sinogram_Trues.raw.gz
 print(result.wall_time_s)       # how long it took
