@@ -51,13 +51,14 @@ class VoxFileGenerator:
         ]
         return "\n".join(parts) + "\n"
 
-    def write(self, run_dir, filename="voxel_space.vox") -> Path:
+    def write(self, run_dir, config) -> Path:
         """Write the grid to run_dir/filename. Compression is decided by the
         filename: a name ending in '.gz' is written gzipped, otherwise plain.
         This makes the filename the single source of truth, so the .in reference
         and the file on disk can never disagree about compression."""
         run_dir = Path(run_dir)
         run_dir.mkdir(parents=True, exist_ok=True)
+        filename = config["mcgpu"]["voxel_space_file"]
         out = run_dir / filename
         payload = self._header() + self._body()
         if filename.endswith(".gz"):
@@ -68,10 +69,11 @@ class VoxFileGenerator:
         return out
 
 
-def read_vox(path, config=None) -> VoxelGrid:
+def read_vox(run_dir, config=None) -> VoxelGrid:
     """Parse a .vox (or .vox.gz) back into a voxel space. Used for round-trip tests
     and re-loading recorded runs."""
-    path = Path(path)
+    run_dir = Path(run_dir)
+    path = run_dir / config["mcgpu"]["voxel_space_file"]
     opener = gzip.open if path.suffix == ".gz" else open
     with opener(path, "rt") as f:
         text = f.read()

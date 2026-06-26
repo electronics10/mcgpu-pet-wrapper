@@ -32,6 +32,9 @@ That's it — no cloning required.
 
 > **Already using uv or pixi?** Install the same git URL with your tool, e.g. `uv add git+https://github.com/electronics10/mcgpu-pet-wrapper.git` or `pixi add --pypi "mcgpu-pet-wrapper @ git+https://github.com/electronics10/mcgpu-pet-wrapper.git"`. These record the dependency in your project manifest and manage the environment for you, so you can skip the venv/conda step above.
 
+For developers:
+> git clone the repository and try `uv sync`.
+
 **Heads up**
 
 > **Platform and GPU.** The pure-Python API — building voxel spaces, reading outputs — works anywhere (Linux, macOS, Windows). Running an actual simulation (`Runner`) is **Linux-only and needs an NVIDIA GPU with CUDA**, because the bundled `MCGPU-PET.x` is a compiled Linux/CUDA binary. GPU binaries are also architecture-specific: if the simulator fails to run, rebuild it from the [MCGPU-PET source](https://github.com/DIDSR/MCGPU-PET) and replace `mcgpu_pet_wrapper/MCGPU-PET.x`.
@@ -452,14 +455,16 @@ print(voxel_space)
 
 #### 3.2.2 Vox input output
 
-MCGPU-PET does not read Python objects; it reads a text file in a specific format (penEasy 2008, with one extra column for activity). This module turns a voxel space into that file, and can read one back.
+MCGPU-PET does not read Python objects; it reads a text file in a specific 
+format (penEasy 2008, with one extra column for activity). This module 
+turns a voxel space into that file, and can read one back.
 
-`VoxFileGenerator(voxel_space).write(run_dir, filename)` writes the file.
+`VoxFileGenerator(voxel_space).write(run_dir, cfg)` writes the file.
 The format is a short header (voxel counts, voxel sizes in cm, a couple of
 bookkeeping lines) followed by one line per voxel: `material density activity`.
 
 ```python
-mpw.VoxFileGenerator(voxel_space).write("data/run_0", cfg["mcgpu"]["voxel_space_file"])
+mpw.VoxFileGenerator(voxel_space).write("data/run_0", cfg)
 ```
 
 The one subtle thing the writer gets right is voxel order. The file lists
@@ -473,7 +478,7 @@ it mainly to confirm a round-trip: write a phantom, read it back, check it is
 identical. It is also handy for re-loading a recorded run.
 
 ```python
-vox = mpw.read_vox("data/run_0/" + cfg["mcgpu"]["voxel_space_file"], cfg)
+vox = mpw.read_vox("data/run_0/", cfg)
 
 print(vox.shape_zyx)
 ```

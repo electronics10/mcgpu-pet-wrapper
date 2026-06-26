@@ -61,7 +61,7 @@ def build_run(
 
     validate_config(config)
 
-    # suffix). Patch a copy so the recorded config.json matches what ran.
+    # Patch a copy so the recorded config.json matches what ran.
     cfg = json.loads(json.dumps(config))  # deep copy
 
     (run_dir / "config.json").write_text(json.dumps(cfg, indent=2))
@@ -70,8 +70,7 @@ def build_run(
     gen.from_config(cfg)
     gen.write(run_dir)
 
-    vox_name = cfg["mcgpu"]["voxel_space_file"]
-    VoxFileGenerator(voxel_space).write(run_dir, vox_name)
+    VoxFileGenerator(voxel_space).write(run_dir, cfg)
     return run_dir
 
 
