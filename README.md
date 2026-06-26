@@ -1,79 +1,51 @@
 ## Introduction
 This is a Python wrapper which wraps MCGPU-PET (Badal et al., Comput. Phys. Commun. 295 (2024) 109008, doi:10.1016/j.cpc.2023.109008), developed at the US FDA and in the public domain (17 U.S.C. §105). The bundled MCGPU-PET.x binary and the simulation engine are their work; this repository adds a Python configuration, phantom-building, and I/O layer. If you use this in published work, please cite the original MCGPU-PET paper.
 
+
 ## Installation
 
-This package wraps [MCGPU-PET](https://github.com/DIDSR/MCGPU-PET) and is managed with [pixi](https://pixi.sh). If you don't have pixi, install it first by following the instructions at https://pixi.sh.
+You need Python 3.10 or newer. The only dependency is `numpy`.
 
-> **Note on the binary and GPU.** A compiled `MCGPU-PET.x` is included, but GPU binaries are architecture-specific. If you clone this on a machine with a different GPU and the simulator fails to run, rebuild it from the [MCGPU-PET source](https://github.com/DIDSR/MCGPU-PET) and replace `mcgpu_pet_wrapper/MCGPU-PET.x`. The Python API (building voxel spaces, reading outputs) works without a GPU; only running an actual simulation (`Runner`) needs an NVIDIA GPU with CUDA.
-
-### Step 1 — Clone this repository
-
-Pick a location to keep the wrapper. A simple convention is to keep the wrapper and the projects that use it **side by side** in one folder:
+Create a project folder and move in:
 
 ```bash
-mkdir -p ~/projects
-cd ~/projects
-git clone https://github.com/electronics10/mcgpu-pet-wrapper.git
-```
-
-You now have `~/projects/mcgpu-pet-wrapper`.
-
-### Step 2 — Create your own project next to it
-
-```bash
-cd ~/projects
 mkdir my-pet-project
 cd my-pet-project
-pixi init
 ```
 
-`pixi init` creates a `pixi.toml` file. Your layout now looks like this:
+It's good practice to install into an **isolated environment** (a self-contained Python setup for this project, so its packages don't collide with other work). You can use Python's built-in `venv`, conda/mamba, uv, or pixi, etc.
 
-```
-~/projects/
-├── mcgpu-pet-wrapper/      <- the wrapper you cloned
-└── my-pet-project/         <- your project, where you write code
-    └── pixi.toml
-```
+> For example:
+> ```bash
+> python -m venv .venv && source .venv/bin/activate   # built-in venv
+> # or
+> conda create -n pet python=3.10 && conda activate pet
+> ```
 
-### Step 3 — Add the wrapper as a dependency
-
-Open `my-pet-project/pixi.toml` in a text editor and add these lines at the end:
-
-```toml
-[pypi-dependencies]
-mcgpu-pet-wrapper = { path = "../mcgpu-pet-wrapper", editable = true }
-```
-
-The path `../mcgpu-pet-wrapper` means "go up one folder, then into mcgpu-pet-wrapper" -- it is relative to _your project_. This works because of the side-by-side layout above. (If you cloned the wrapper somewhere else, use the full absolute path instead, e.g. `path = "/home/you/tools/mcgpu-pet-wrapper"`.)
-
-`editable = true` means that if you ever edit the wrapper's code, the changes take effect immediately, with no reinstall.
-
-`[pypi-dependencies]`  is used (not `[tool.pixi.pypi-dependencies]`) because in a standalone `pixi.toml` the section is top-level; the `tool.pixi.` prefix is only for when the config lives inside a `pyproject.toml`. Since `pixi init` creates a `pixi.toml`, the shorter form is correct. Worth knowing if you have a `pyproject.toml`-based project instead — then you'd need the prefixed form.
-
-Then install:
+Then install the package straight from GitHub:
 
 ```bash
-pixi add python
-pixi install
+pip install git+https://github.com/electronics10/mcgpu-pet-wrapper.git
 ```
 
-Supplement: 
-1. You may add a `pyrightconfig.json` in the local root (`{"extraPaths": ["../mcgpu-pet-wrapper"]}`), a version-controllable way to configure Pyright-based tools (e.g., Pylance), to resolve static analysis of Pylance for better experience.
-2. Ask AI for help if you don't know how to install the module.
+That's it — no cloning required.
 
+> **Already using uv or pixi?** Install the same git URL with your tool, e.g. `uv add git+https://github.com/electronics10/mcgpu-pet-wrapper.git` or `pixi add --pypi "mcgpu-pet-wrapper @ git+https://github.com/electronics10/mcgpu-pet-wrapper.git"`. These record the dependency in your project manifest and manage the environment for you, so you can skip the venv/conda step above.
 
-### Step 4 — Write and run a script
+**Heads up**
 
-Create a file `my-pet-project/main.py`:
+> **Platform and GPU.** The pure-Python API — building voxel spaces, reading outputs — works anywhere (Linux, macOS, Windows). Running an actual simulation (`Runner`) is **Linux-only and needs an NVIDIA GPU with CUDA**, because the bundled `MCGPU-PET.x` is a compiled Linux/CUDA binary. GPU binaries are also architecture-specific: if the simulator fails to run, rebuild it from the [MCGPU-PET source](https://github.com/DIDSR/MCGPU-PET) and replace `mcgpu_pet_wrapper/MCGPU-PET.x`.
+
+### Quick check
+
+Create `main.py`:
 
 ```python
 import mcgpu_pet_wrapper as mpw
 
 # Load the built-in default configuration (no file path needed).
 cfg = mpw.default_config()
-mpw.validate_config(cfg) # validate
+mpw.validate_config(cfg)
 
 # Build a simple test object: a point source.
 voxel_space = mpw.point_source(cfg)
@@ -84,19 +56,17 @@ mpw.build_run("data/run_0", cfg, voxel_space)
 print("Setup OK. Run directory created at data/run_0.")
 ```
 
-Run it **through pixi** so it uses the project's environment:
+Run it:
 
 ```bash
-pixi run python main.py
+python main.py
 ```
 
-> Always use `pixi run python ...`, not plain `python ...`. The wrapper lives inside the project's pixi environment, so plain `python` won't find it (you'd get `ModuleNotFoundError: No module named 'mcgpu_pet_wrapper'`).
+If you see `Setup OK.`, the package is installed correctly. This builds the input files but does not run the simulator — see [Running a simulation](#running-an-actual-simulation) below for that.
 
-If you see `Setup OK.`, everything is installed correctly.
+### Running an actual simulation (needs a GPU)
 
-### Step 5 — Run an actual simulation (needs a GPU)
-
-The step above builds the input files but does not run the simulator. To run it (on a machine with an NVIDIA GPU and the compiled binary):
+On a Linux machine with an NVIDIA GPU and the compiled binary, run the staged directory and read back the results:
 
 ```python
 result = mpw.Runner()("data/run_0", on_existing="overwrite")

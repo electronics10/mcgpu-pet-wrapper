@@ -12,39 +12,14 @@ dependencies = [
     "numpy>=1.24",
 ]
 
-# Optional extras: install with  pip install -e ".[viz]"  or  ".[dev]"
-[project.optional-dependencies]
-viz = ["matplotlib>=3.6"]
-dev = ["pytest>=7"]
-
 # --- packaging ---------------------------------------------------------------
-# Flat layout: the importable package sits directly at the repo root as
-# mcgpu_pet_wrapper/ (not under src/). If you later switch to a src/ layout,
-# change `where` to ["src"].
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["mcgpu_pet_wrapper*"]
 
-# Ship the non-Python assets INSIDE the package so they are found after install
-# via Path(__file__).parent / ... :
-#   - the compiled GPU binary (machine-specific; shipped because this is for
-#     your own use, not redistribution)
-#   - the .in / .json templates
-#   - the material cross-section files
 [tool.setuptools.package-data]
 mcgpu_pet_wrapper = [
     "MCGPU-PET.x",
     "templates/*",
     "materials/*",
 ]
-
-[tool.pixi.workspace]
-channels = ["conda-forge"]
-platforms = ["linux-64"]
-
-[tool.pixi.pypi-dependencies]
-mcgpu-pet-wrapper = { path = ".", editable = true }
-
-[tool.pixi.dependencies]
-python = ">=3.10"
-numpy = ">=1.24"
