@@ -560,7 +560,6 @@ Its geometry (all standard, baked into the function): a 30 mm-wide, 50 mm-long p
 cfg = mpw.default_config()
 
 voxel_space = mpw.nema_iq_preclinical(cfg, hot_activity_Bq_per_mL=37000.0)
-
 ```
 
 About the `materials` argument: the function needs three material roles - `air`,
@@ -594,8 +593,8 @@ your geometry-mismatch alarm), and reshapes to `(NSINOS, NANGLES, NRAD)`:
 
 ```python
 cfg = mpw.load_config("data/run_0/config.json")
-sino = mpw.read_sinogram("data/run_0/sinogram_Trues.raw.gz", cfg)
 
+sino = mpw.read_sinogram("data/run_0/sinogram_Trues.raw.gz", cfg)
 print(sino.shape)
 ```
 
@@ -606,9 +605,7 @@ that code to get it right rather than guessing.
 `read_sinogram_segments` splits the flat sinogram into per-segment 3D arrays with their ring-difference and axial labelling. You get a list of clean, labelled per-segment sinograms instead of one opaque stack.
 
 ```python
-cfg = mpw.load_config("data/run_0/config.json")
 sino = mpw.read_sinogram_segments("data/run_0/sinogram_Trues.raw.gz", cfg)
-
 print(sino[5]["data"].shape)
 ```
 
@@ -624,7 +621,6 @@ a ground-truth reference, not something a real scanner could measure.
 
 ```python
 img = mpw.read_emission_image("data/run_0/image_Trues.raw.gz", cfg)
-
 print(img.shape)
 ```
 
@@ -644,6 +640,9 @@ sino = mpw.read_sinogram_segments("data/run_0/sinogram_Trues.raw.gz", cfg)
 
 print(rb.ssrb(sino, cfg).shape)
 print(rb.fore(sino, cfg).shape)
+
+# print(rb.ssrb(sino, cfg, arc_correction=False).shape)
+# print(rb.fore(sino, cfg, arc_correction=False).shape)
 ```
 
 Note that arc correction is done by default so one doesn't have to worry about it downstream. (You may call `sino = rb.arc_correct(sino, cfg)` to see it explicitly.) If you plan on doing iterative reconstruction later, you may want to turn it off.
