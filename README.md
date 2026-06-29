@@ -74,10 +74,10 @@ If you see `Setup OK.`, the package is installed correctly. This builds the inpu
 On a Linux machine with an NVIDIA GPU and the compiled binary, run the staged directory and read back the results:
 
 ```python
-result = mpw.Runner()("data/run_0", on_existing="overwrite")
+mpw.Runner()("data/run_0", on_existing="overwrite")
 
-trues   = mpw.read_sinogram(result.sinogram_trues,   cfg)   # (NSINOS, NANGLES, NRAD)
-scatter = mpw.read_sinogram(result.sinogram_scatter, cfg)
+trues   = mpw.read_sinogram("data/run_0", cfg)   # (NSINOS, NANGLES, NRAD)
+scatter = mpw.read_sinogram("data/run_0", cfg, scatter=True)
 print("trues:", trues.shape, "total counts:", trues.sum())
 ```
 
