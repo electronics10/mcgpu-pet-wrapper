@@ -34,9 +34,11 @@ import numpy as np
 from .config import sinogram_shape, segment_table, num_voxels
 
 
-def read_sinogram(path, config: dict) -> np.ndarray:
+def read_sinogram(run_dir, config: dict, scatter=False) -> np.ndarray:
     """Read a sinogram .raw.gz into shape (NSINOS, NANGLES, NRAD) int32."""
     info = sinogram_shape(config)
+    if scatter: path = Path(run_dir) / "sinogram_Scatter.raw.gz"
+    else: path = Path(run_dir) / "sinogram_Trues.raw.gz"
     raw = _read_int32(path)
     if raw.size != info["NBINS"]:
         raise ValueError(
@@ -46,7 +48,7 @@ def read_sinogram(path, config: dict) -> np.ndarray:
     return raw.reshape(info["shape_csr"], order="C")
 
 
-def read_sinogram_segments(path, config: dict) -> list[dict]:
+def read_sinogram_segments(run_dir, config: dict, scatter=False) -> list[dict]:
     """Read a sinogram and split it into per-segment 3D arrays.
 
     Returns a list (in storage order) of dicts:
@@ -61,7 +63,7 @@ def read_sinogram_segments(path, config: dict) -> list[dict]:
     has a known polar angle (from ring difference) and axial mapping, which is
     exactly what SSRB/FORE need.
     """
-    full = read_sinogram(path, config)         # (NSINOS, NANGLES, NRAD)
+    full = read_sinogram(run_dir, config, scatter)         # (NSINOS, NANGLES, NRAD)
     segs = segment_table(config)
     out = []
     for seg in segs:
@@ -77,10 +79,12 @@ def read_sinogram_segments(path, config: dict) -> list[dict]:
     return out
 
 
-def read_emission_image(path, config: dict) -> np.ndarray:
+def read_emission_image(run_dir, config: dict, scatter=False) -> np.ndarray:
     """Read an emission image .raw.gz into shape (Nz, Ny, Nx) int32 -- the same
     shape as the voxel grid. Uses the axis-order-aware num_voxels accessor."""
     nx, ny, nz = num_voxels(config)
+    if scatter: path = Path(run_dir) / "image_Scatter.raw.gz"
+    else: path = Path(run_dir) / "image_Trues.raw.gz"
     raw = _read_int32(path)
     expected = nx * ny * nz
     if raw.size != expected:
@@ -91,15 +95,16 @@ def read_emission_image(path, config: dict) -> np.ndarray:
     return raw.reshape((nz, ny, nx), order="C")
 
 
-def summarize_sinogram(path, config: dict) -> dict:
+def summarize_sinogram(run_dir, config: dict, scatter=False) -> dict:
     """Quick stats for a sinogram file (dataset sanity checks)."""
-    s = read_sinogram(path, config)
+    s = read_sinogram(run_dir, config, scatter)
     return {
+        "scatter": scatter,
         "shape": s.shape,
         "total_counts": int(s.sum()),
         "max_bin": int(s.max()),
         "nonzero_bins": int((s > 0).sum()),
-        "fraction_nonzero": float((s > 0).mean()),
+        "mean_nonzero": float((s > 0).mean()),
     }
 
 

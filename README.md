@@ -594,15 +594,20 @@ voxel_space = mpw.point_source(cfg)
 
 MCGPU-PET writes its sinograms as a flat stream of numbers in a `.gz` file. To use them we must reshape that stream into a 3D array - and to reshape correctly we need the exact dimensions, which come from the config.
 
-`read_sinogram(path, config)` does this. It reads the file, checks the number
-of values matches what the config predicts (raising a clear error if not - that is
-your geometry-mismatch alarm), and reshapes to `(NSINOS, NANGLES, NRAD)`:
+`read_sinogram(run_dir, config, scatter: bool)` does this. MCGPU-PET generates both 
+true (`sinogram_Trues.raw.gz`) and scatter (`sinogram_Scatter.raw.gz`) data, seperately. 
+With the `scatter: bool` field, one can choose whether they want to read the true or scatter sample. 
+**The scatter field is set to `False` by default, i.e. `sinogram_Trues.raw.gz` is chosen by default.** 
+The function reads a file, checks the number of values matches what the config predicts (raising a clear 
+error if not - that is your geometry-mismatch alarm), and reshapes to `(NSINOS, NANGLES, NRAD)`:
 
 ```python
 cfg = mpw.load_config("data/run_0/config.json")
 
-sino = mpw.read_sinogram("data/run_0/sinogram_Trues.raw.gz", cfg)
-print(sino.shape)
+sino_true = mpw.read_sinogram("data/run_0", cfg)
+sino_scatter = mpw.read_sinogram("data/run_0", cfg, scatter=True)
+print(sino_true.shape)
+print(sino_scatter.shape)
 ```
 
 The shape order - planes, then angular, then radial - comes straight from how the
@@ -612,14 +617,17 @@ that code to get it right rather than guessing.
 `read_sinogram_segments` splits the flat sinogram into per-segment 3D arrays with their ring-difference and axial labelling. You get a list of clean, labelled per-segment sinograms instead of one opaque stack.
 
 ```python
-sino = mpw.read_sinogram_segments("data/run_0/sinogram_Trues.raw.gz", cfg)
-print(sino[5]["data"].shape)
+sino_true = mpw.read_sinogram_segments("data/run_0", cfg)
+print(sino_true[5]["data"].shape)
+sino_scatter = mpw.read_sinogram_segments("data/run_0", cfg, scatter=True)
+print(sino_scatter[5]["data"].shape)
 ```
 
 `summarize_sinogram` for sanity checks: 
 
 ```python
-print(mpw.summarize_sinogram("data/run_0/sinogram_Trues.raw.gz", cfg))
+print(mpw.summarize_sinogram("data/run_0", cfg))
+print(mpw.summarize_sinogram("data/run_0", cfg, scatter=True))
 ```
 
 `read_emission_image(path, config)` reads the "emission images" (per-voxel
@@ -627,8 +635,10 @@ counts of detected coincidences) into the object's shape `(Nz, Ny, Nx)`. These a
 a ground-truth reference, not something a real scanner could measure.
 
 ```python
-img = mpw.read_emission_image("data/run_0/image_Trues.raw.gz", cfg)
-print(img.shape)
+img_true = mpw.read_emission_image("data/run_0", cfg)
+print(img_true.shape)
+img_scatter = mpw.read_emission_image("data/run_0", cfg, scatter=True)
+print(img_scatter.shape)
 ```
 
 ### 3.6 Auxiliary: Rebinning
@@ -643,7 +653,7 @@ from mcgpu_pet_wrapper import rebinning as rb
 cfg = mpw.load_config("data/run_0/config.json")
 
 # Load sinogram segments
-sino = mpw.read_sinogram_segments("data/run_0/sinogram_Trues.raw.gz", cfg)
+sino = mpw.read_sinogram_segments("data/run_0", cfg)
 
 print(rb.ssrb(sino, cfg).shape)
 print(rb.fore(sino, cfg).shape)
@@ -679,23 +689,23 @@ simulation = mpw.Runner()(run_dir, "overwrite")
 To read the data, try:
 
 ```python
+from pathlib import Path
 import mcgpu_pet_wrapper as mpw
 
 
 run_dir = "data/run_0"
-cfg_path = run_dir + "/config.json"
-img_path = run_dir + "/image_Trues.raw.gz"
-sino_path = run_dir + "/sinogram_Trues.raw.gz"
+run_dir = Path(run_dir)
+cfg_path = run_dir / "config.json"
 
 # Load configuration
 cfg = mpw.load_config(cfg_path)
 
 # Load emission image
-image = mpw.read_emission_image(img_path, cfg)
+image = mpw.read_emission_image(run_dir, cfg)
 print(image.shape)
 
 # Load sinogram segments
-sino = mpw.read_sinogram_segments(sino_path, cfg)
+sino = mpw.read_sinogram_segments(run_dir, cfg)
 print(sino[5]["data"].shape)
 ```
 
@@ -727,13 +737,13 @@ fig, axes = plt.subplots(2, 3, figsize=(21,14))
 
 # load simulation data ---------
 # emission image
-img = mpw.read_emission_image(run_dir / "image_Trues.raw.gz", cfg)
+img = mpw.read_emission_image(run_dir, cfg)
 img = np.sum(img, axis=0)
 axes[1][0].imshow(img, origin="lower")
 axes[1][0].set_title("mcgpu_image")
 
 # sinogram
-sino = mpw.read_sinogram_segments(run_dir / "sinogram_Trues.raw.gz",cfg)
+sino = mpw.read_sinogram_segments(run_dir,cfg)
 sino = rb.ssrb(sino, cfg)
 sino = np.sum(sino, axis=0)
 axes[1][1].imshow(sino, origin="lower")

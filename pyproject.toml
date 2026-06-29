@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcgpu-pet-wrapper"
-version = "0.1.1"
+version = "0.2.0"
 description = "A Python wrapper for the MCGPU-PET Monte Carlo PET simulator"
 readme = "README.md"
 requires-python = ">=3.10"
