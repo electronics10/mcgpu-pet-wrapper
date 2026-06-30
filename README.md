@@ -1,8 +1,39 @@
+# A Python Wrapper for MCGPU-PET
 ![GitHub release](https://img.shields.io/github/v/release/electronics10/mcgpu-pet-wrapper?include_prereleases)
 
-## Introduction
 This is a Python wrapper which wraps MCGPU-PET (Badal et al., Comput. Phys. Commun. 295 (2024) 109008, doi:10.1016/j.cpc.2023.109008), developed at the US FDA and in the public domain (17 U.S.C. §105). The bundled MCGPU-PET.x binary and the simulation engine are their work; this repository adds a Python configuration, phantom-building, and I/O layer. If you use this in published work, please cite the original MCGPU-PET paper.
 
+---
+
+## Table of contents
+
+## Table of contents
+
+- [Installation](#installation)
+  - [Quick check](#quick-check)
+  - [Running an actual simulation](#running-an-actual-simulation)
+- [1 Prerequisite for MCGPU-PET](#1-prerequisite-for-mcgpu-pet)
+  - [1.1 Installation](#11-installation)
+  - [1.2 Basic IO](#12-basic-io)
+- [2 A Closer look in MCGPU-PET (original, not this wrapper)](#2-a-closer-look-in-mcgpu-pet-original-not-this-wrapper)
+  - [2.1 The First Run](#21-the-first-run)
+  - [2.2 phantom_9x9x9cm.vox](#22-phantom_9x9x9cmvox)
+  - [2.3 MCGPU-PET.in](#23-mcgpu-petin)
+- [3 Building a Python Wrapper for MCGPU-PET](#3-building-a-python-wrapper-for-mcgpu-pet)
+  - [3.1 Configuration](#31-configuration)
+  - [3.2 Voxel Space](#32-voxel-space)
+    - [3.2.1 VoxelGrid Class and VoxelSpaceBuilder](#321-voxelgrid-class-and-voxelspacebuilder)
+    - [3.2.2 Vox input output](#322-vox-input-output)
+  - [3.3 Input file generator](#33-input-file-generator)
+  - [3.4 Runner](#34-runner)
+  - [3.5 Utilities](#35-utilities)
+    - [3.5.1 phantoms.py](#351-phantomspy)
+    - [3.5.2 data_reader.py](#352-data_readerpy)
+  - [3.6 Auxiliary: Rebinning](#36-auxiliary-rebinning)
+- [4 A Full Run](#4-a-full-run)
+- [5 Sinogram Angular and Radial Conventions](#5-sinogram-angular-and-radial-conventions)
+
+---
 
 ## Installation
 
@@ -69,7 +100,7 @@ python main.py
 
 If you see `Setup OK.`, the package is installed correctly. This builds the input files but does not run the simulator — see [Running a simulation](#running-an-actual-simulation) below for that.
 
-### Running an actual simulation (needs a GPU)
+### Running an actual simulation
 
 On a Linux machine with an NVIDIA GPU and the compiled binary, run the staged directory and read back the results:
 
@@ -82,6 +113,8 @@ print("trues:", trues.shape, "total counts:", trues.sum())
 ```
 
 See the sections below for the full walkthrough of every module.
+
+---
 
 ## 1 Prerequisite for MCGPU-PET
 
@@ -167,6 +200,7 @@ time ./MCGPU-PET.x MCGPU-PET.in | tee MCGPU-PET.out
 
 Note that the `.in` file requires a `.vox` file (simulation object such as a phantom) and some `.gz` files (materials). 
 
+---
 
 ## 2 A Closer look in MCGPU-PET (original, not this wrapper)
 
@@ -317,6 +351,8 @@ materials/water_5-515keV.mcgpu.gz           # 2
 - This is mostly fine — but the reason it's fine is specific, and there's one caveat. MCGPU-PET explicitly checks that each material's cross-section table extends up to the annihilation energy (511 keV) and aborts with an error otherwise. At 511 keV in light tissue, Compton (incoherent) scattering dominates every other photon process — photoelectric and Rayleigh are smaller by roughly two orders of magnitude. The Compton interaction rate per unit volume is governed by electron density: $$n_e = \rho \cdot \frac{Z}{A} \cdot N_A.$$For soft tissues $Z/A$ is nearly constant (water 0.555, muscle ~0.550, fat ~0.557 — all within ~1%). So once you scale water by the right $\rho$, you reproduce the correct electron density, and therefore the correct scatter behavior, to ~1% for any soft tissue. The clinical world relies on exactly this: PET attenuation correction maps CT to 511 keV with a bilinear water/bone rule, because soft tissue tracks water and only bone needs a separate anchor. The one caveat: bone. Cortical bone has $Z/A \approx 0.53$ (lower than water) and higher effective $Z$. Two consequences: First, using water composition at bone density slightly _overestimates_ electron density (by the $Z/A$ ratio, ~4–5%), hence overestimates Compton/scatter in those voxels. Secondly, the small residual photoelectric/coherent contribution that bone's higher-$Z$ elements (Ca, P) add is missed. For preclinical mouse imaging this is a minor effect: bone is thin, low-volume, and the scatter sinogram is a smooth quantity that integrates over the whole body, so a few-percent error confined to bone voxels largely averages out. MCGPU-PET's own validation is only quoted as ~10% agreement against GATE/PeneloPET, so a bone-composition error well under that is in the noise.
 
 - Baically, water + per-voxel density is enough. Treat density as a heterogeneity knob. (If you later want bone fidelity or generalization to bony/contrast-bearing regions: generate a proper bone material valid to 511 keV with PENELOPE's material program, and assign bone voxels that material rather than up-scaling water density.)
+
+---
 
 ## 3 Building a Python Wrapper for MCGPU-PET
 
@@ -664,6 +700,8 @@ print(rb.fore(sino, cfg).shape)
 
 Note that arc correction is done by default so one doesn't have to worry about it downstream. (You may call `sino = rb.arc_correct(sino, cfg)` to see it explicitly.) If you plan on doing iterative reconstruction later, you may want to turn it off.
 
+---
+
 ## 4 A Full Run
 
 ```python
@@ -709,6 +747,7 @@ sino = mpw.read_sinogram_segments(run_dir, cfg)
 print(sino[5]["data"].shape)
 ```
 
+---
 
 ## 5 Sinogram Angular and Radial Conventions
 
