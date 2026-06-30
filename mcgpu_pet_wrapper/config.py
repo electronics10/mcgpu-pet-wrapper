@@ -67,6 +67,8 @@ def load_config(*paths):
     return merged
 
 def save_config(config: dict, path: str | Path = "config.json") -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     with open(Path(path), 'w') as file:
         json.dump(config, file, indent=2)
     print("Config save to", path)
