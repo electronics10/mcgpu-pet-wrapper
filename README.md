@@ -7,8 +7,6 @@ This is a Python wrapper which wraps MCGPU-PET (Badal et al., Comput. Phys. Comm
 
 ## Table of contents
 
-## Table of contents
-
 - [Installation](#installation)
   - [Quick check](#quick-check)
   - [Running an actual simulation](#running-an-actual-simulation)
