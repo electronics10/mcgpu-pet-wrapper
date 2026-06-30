@@ -1,7 +1,7 @@
 from .config import (
     default_config, load_config, validate_config, num_voxels, grid_size_mm, 
     voxel_space_shape_xyz, voxel_space_shape_zyx, voxel_space_extent_mm, 
-    segment_table, sinogram_shape, radial_fov_mm
+    segment_table, sinogram_shape, radial_fov_mm, save_config
 )
 from .voxel_grid import VoxelGrid, VoxelSpaceBuilder
 from .vox_io import VoxFileGenerator, read_vox
@@ -12,7 +12,7 @@ from .data_reader import (read_sinogram, read_sinogram_segments,
                           read_emission_image, summarize_sinogram)
 
 __all__ = [
-    "default_config", "load_config", "validate_config", "num_voxels", 
+    "default_config", "load_config", "validate_config", "num_voxels", "save_config"
     "grid_size_mm", "voxel_space_shape_xyz", "voxel_space_shape_zyx", 
     "voxel_space_extent_mm", "segment_table", "sinogram_shape", "radial_fov_mm",
     "VoxelGrid", "VoxelSpaceBuilder", "VoxFileGenerator", "read_vox",

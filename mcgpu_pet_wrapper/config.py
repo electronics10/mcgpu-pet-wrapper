@@ -66,6 +66,11 @@ def load_config(*paths):
                 merged[section] = fields
     return merged
 
+def save_config(config: dict, path: str | Path = "config.json") -> None:
+    with open(Path(path), 'w') as file:
+        json.dump(config, file, indent=2)
+    print("Config save to", path)
+
 def default_config():
     template_path = Path(__file__).parent / "templates" / "template.json"
     return load_config(template_path)
