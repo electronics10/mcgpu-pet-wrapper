@@ -457,7 +457,7 @@ The template is dedicated to a specific configuration as stated in the following
 
 2. `energy_window_low_eV` (358000) and `energy_window_high_eV` (664000) are the scanner's real "30%" window, and `energy_resolution` (0.15 = ~15% @ 511 keV) is its real blurring. These three dominate the scatter fraction — the quantity you validate against (6.9% mouse, 14.2% rat). Change them to match a different real acquisition, not to tune results.
 
-3. `isotope_mean_life_s: 9508`: simulating F-18.
+3. `isotope_mean_life_s: 9502`: simulating F-18.
 
 </details>
 
